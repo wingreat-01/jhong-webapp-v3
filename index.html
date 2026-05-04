@@ -472,6 +472,110 @@ body.design-mode .design-tip {
   white-space:nowrap;
 }
 
+/* ============================================================
+   SIDEBAR LAYOUT
+   ============================================================ */
+html,body{height:100%;overflow:hidden}
+.app-shell{display:flex;height:100vh;overflow:hidden}
+
+.sidebar{
+  width:220px;min-width:220px;flex-shrink:0;
+  background:#111827;
+  display:flex;flex-direction:column;
+  height:100vh;overflow-y:auto;overflow-x:hidden;
+  z-index:100;
+}
+
+.sidebar-brand{
+  display:flex;align-items:center;gap:10px;
+  padding:18px 16px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  flex-shrink:0;
+}
+.sidebar-logo{
+  width:36px;height:36px;flex-shrink:0;
+  background:linear-gradient(135deg,#1B5E20 0%,#43A047 100%);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800;color:#fff;
+}
+.sidebar-app-name{font-size:14px;font-weight:700;color:#F9FAFB;letter-spacing:0.3px;line-height:1.2}
+.sidebar-app-sub{font-size:10px;color:rgba(255,255,255,0.38);margin-top:2px;line-height:1.2}
+
+/* Override horizontal nav styles for sidebar */
+nav#mainNav{
+  flex-direction:column!important;background:transparent!important;
+  border:none!important;box-shadow:none!important;
+  padding:8px 0!important;gap:0!important;overflow-x:visible!important;
+  display:flex!important;flex:1;
+}
+.nav-tab{
+  padding:10px 16px!important;font-size:13px!important;font-weight:500!important;
+  color:#9CA3AF!important;
+  border-bottom:none!important;border-top:none!important;border-right:none!important;
+  border-left:3px solid transparent!important;
+  border-radius:0!important;
+  width:100%!important;text-align:left!important;
+  white-space:nowrap!important;justify-content:flex-start!important;
+  background:transparent!important;transition:color .15s,background .15s!important;
+  display:flex!important;align-items:center!important;gap:10px!important;
+}
+.nav-tab:hover{color:#F9FAFB!important;background:rgba(255,255,255,0.06)!important}
+.nav-tab.active{
+  color:#60A5FA!important;border-left-color:#3B82F6!important;
+  background:rgba(59,130,246,0.12)!important;font-weight:600!important;
+}
+.nav-tab .tab-icon{font-size:14px!important;width:18px;text-align:center;flex-shrink:0}
+
+.sidebar-footer{
+  border-top:1px solid rgba(255,255,255,0.07);
+  padding:6px 0;display:flex;flex-direction:column;flex-shrink:0;
+}
+.sidebar-footer-btn{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 16px;width:100%;
+  font-size:12px;font-weight:600;color:#9CA3AF;
+  background:transparent;border:none;cursor:pointer;
+  text-align:left;transition:color .15s,background .15s;
+  font-family:inherit;
+}
+.sidebar-footer-btn:hover{color:#F9FAFB;background:rgba(255,255,255,0.06)}
+.sidebar-footer-btn.loading{opacity:.6;cursor:not-allowed}
+
+.sidebar-user{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 16px;
+  border-top:1px solid rgba(255,255,255,0.07);
+  flex-shrink:0;
+}
+.sidebar-user .role-badge{font-size:11px;padding:3px 8px}
+.sidebar-user .role-badge.role-user{background:rgba(255,255,255,0.08);color:#9CA3AF;border-color:rgba(255,255,255,0.12)}
+.sidebar-user .role-badge.role-admin{background:rgba(198,40,40,0.18);color:#FCA5A5;border-color:rgba(239,68,68,0.35)}
+#adminBtn.sidebar-admin-btn{
+  padding:5px 10px!important;font-size:11px!important;
+  border-radius:6px!important;border:1px solid rgba(239,68,68,0.3)!important;
+  background:rgba(239,68,68,0.1)!important;color:#FCA5A5!important;
+  width:auto!important;margin-left:auto;
+  font-family:inherit;cursor:pointer;font-weight:600;
+  white-space:nowrap;transition:all .15s;
+}
+#adminBtn.sidebar-admin-btn:hover{background:rgba(239,68,68,0.2)!important;border-color:rgba(239,68,68,0.5)!important}
+
+/* Main scrollable area */
+.main-area{flex:1;overflow-y:auto;height:100vh;background:#f0f2f5;min-width:0}
+
+header{display:none!important}
+
+@media(max-width:700px){
+  .sidebar{width:180px;min-width:180px}
+  .nav-tab{padding:9px 12px!important;font-size:12px!important}
+}
+@media(max-width:500px){
+  .app-shell{flex-direction:column}
+  .sidebar{width:100%;height:auto;min-width:0;flex-direction:column}
+  nav#mainNav{flex-direction:row!important;flex-wrap:wrap}
+  .main-area{height:auto;overflow-y:visible}
+}
+
 </style>
 </head>
 <body>
@@ -492,35 +596,42 @@ body.design-mode .design-tip {
 
 <div class="toast" id="toast"></div>
 
-<div class="sticky-top">
-<header>
-  <div class="header-inner">
-    <div class="logo">J</div>
-    <div class="header-title">
-      <h1>JHONG Withdrawal System v3.34</h1>
-    </div>
-    <div class="header-actions">
-      <span id="roleBadge" class="role-badge role-user" title="Current role. Click 'Admin' to unlock delete actions for this session.">👤 USER</span>
-      <button class="btn-sync" id="adminBtn" onclick="toggleAdminMode()" title="Switch to Admin mode (required for deletes). Stays unlocked until you close this tab." style="background:#FFEBEE;color:#C62828">🔓 Admin</button>
-      <button class="btn-sync" id="syncBtn" onclick="syncNow({force:true})">↻ Sync Now</button>
-      <button class="btn-sync" id="settingsBtn" onclick="openSettingsWithPin()" title="Show setup / config panel — protected by 4-digit PIN" style="background:#FFF3E0;color:#E65100">⚙ Settings 🔒</button>
-      <button class="btn-sync" id="designModeBtn" onclick="openDesignModeWithPin()" title="Design Mode — labels every UI region with a clickable codename (e.g. #servedFilter, @SO.toolbar). Protected by 4-digit PIN." style="background:#E1F5FE;color:#01579B">🛠 Design 🔒</button>
+<div class="app-shell">
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-logo">J</div>
+    <div>
+      <div class="sidebar-app-name">JHONG</div>
+      <div class="sidebar-app-sub">Withdrawal System v3.34</div>
     </div>
   </div>
-</header>
 
-<nav id="mainNav">
-  <button class="nav-tab active" onclick="switchTab('stocks')"><span class="tab-icon">■</span>Stocks</button>
-  <button class="nav-tab" onclick="switchTab('beginning')"><span class="tab-icon">★</span>Beginning</button>
-  <button class="nav-tab" onclick="switchTab('withdraw')"><span class="tab-icon">↗</span>Withdraw</button>
-  <button class="nav-tab" onclick="switchTab('salesorder')">Sales Order</button>
-  <button class="nav-tab" onclick="switchTab('served')"><span class="tab-icon">✓</span>Served</button>
-  <button class="nav-tab" onclick="switchTab('received')"><span class="tab-icon">↘</span>Received</button>
-  <button class="nav-tab" onclick="switchTab('threemyards')"><span class="tab-icon">▥</span>3M Yards</button>
-  <button class="nav-tab" onclick="switchTab('partialrolls')"><span class="tab-icon">⊞</span>Partial Rolls</button>
-  <button class="nav-tab" onclick="switchTab('search')"><span class="tab-icon">⚲</span>Search</button>
-</nav>
-</div><!-- /sticky-top -->
+  <nav id="mainNav">
+    <button class="nav-tab active" onclick="switchTab('stocks')"><span class="tab-icon">■</span>Stocks</button>
+    <button class="nav-tab" onclick="switchTab('beginning')"><span class="tab-icon">★</span>Beginning</button>
+    <button class="nav-tab" onclick="switchTab('withdraw')"><span class="tab-icon">↗</span>Withdraw</button>
+    <button class="nav-tab" onclick="switchTab('salesorder')"><span class="tab-icon">🛒</span>Sales Order</button>
+    <button class="nav-tab" onclick="switchTab('served')"><span class="tab-icon">✓</span>Served</button>
+    <button class="nav-tab" onclick="switchTab('received')"><span class="tab-icon">↘</span>Received</button>
+    <button class="nav-tab" onclick="switchTab('threemyards')"><span class="tab-icon">▥</span>3M Yards</button>
+    <button class="nav-tab" onclick="switchTab('partialrolls')"><span class="tab-icon">⊞</span>Partial Rolls</button>
+    <button class="nav-tab" onclick="switchTab('search')"><span class="tab-icon">⚲</span>Search</button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <button class="sidebar-footer-btn" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">↻ Sync Now</button>
+    <button class="sidebar-footer-btn" id="settingsBtn" onclick="openSettingsWithPin()" title="Show setup / config panel — protected by 4-digit PIN">⚙ Settings 🔒</button>
+    <button class="sidebar-footer-btn" id="designModeBtn" onclick="openDesignModeWithPin()" title="Design Mode — click to label every UI region with a codename">🛠 Design 🔒</button>
+    <div class="sidebar-user">
+      <span id="roleBadge" class="role-badge role-user" title="Current role. Click Admin to unlock delete actions.">👤 USER</span>
+      <button class="sidebar-admin-btn" id="adminBtn" onclick="toggleAdminMode()" title="Switch to Admin mode (required for deletes). Stays unlocked until you close this tab.">🔓 Admin</button>
+    </div>
+  </div>
+
+</aside>
+
+<div class="main-area">
 
 <div class="content">
 
@@ -1157,6 +1268,8 @@ body.design-mode .design-tip {
 </div>
 
 </div><!-- /content -->
+</div><!-- /main-area -->
+</div><!-- /app-shell -->
 
 <!-- ITEM PICKER (Search) — fixed overlay so it is never clipped -->
 <div class="item-picker" id="itemPicker">
@@ -1289,6 +1402,8 @@ body.design-mode .design-tip {
 <script>
 // === Default ITEMCODE CSV URL (provided by user) — used until they paste their own ===
 var DEFAULT_ITEMCODE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSa1nCpmEPrAt1EB_7xW20MIlxJPXhqRY-hFpsx9x5gsvzmNv1sld8UQ7MSumaty0z_Ye8-bALyHg8Q/pub?output=csv';
+// === Default SALESORDER CSV URL — always pre-filled, no manual entry needed ===
+var DEFAULT_SALESORDER_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSa1nCpmEPrAt1EB_7xW20MIlxJPXhqRY-hFpsx9x5gsvzmNv1sld8UQ7MSumaty0z_Ye8-bALyHg8Q/pub?gid=1859862657&single=true&output=csv';
 
 var STATE = {
   items: [],
@@ -1296,7 +1411,7 @@ var STATE = {
   received: [],
   beginning: {},        // map: ITEMCODE -> {qty, notes, source}
   salesOrders: [],      // list of orders {id,date,time,orderNo,customer,remarks,items:[{code,desc,qty}],status,source}
-  config: {proxyUrl: (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : window.location.href.split('?')[0]), itemcodeCsvUrl: DEFAULT_ITEMCODE_CSV_URL, salesOrderCsvUrl:'', beginningPin: '1234', userPin:'1234', adminPin:'7777'},
+  config: {proxyUrl: (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : window.location.href.split('?')[0]), itemcodeCsvUrl: DEFAULT_ITEMCODE_CSV_URL, salesOrderCsvUrl:DEFAULT_SALESORDER_CSV_URL, beginningPin: '1234', userPin:'1234', adminPin:'7777'},
   lastSync: null,
   hPage: 1,
   rPage: 1,
@@ -1340,10 +1455,10 @@ function loadState() {
       STATE.received = p.received || [];
       STATE.beginning = p.beginning || {};
       STATE.salesOrders = p.salesOrders || [];
-      STATE.config = p.config || {proxyUrl: (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : window.location.href.split('?')[0]), itemcodeCsvUrl: DEFAULT_ITEMCODE_CSV_URL, salesOrderCsvUrl:'', beginningPin: '1234', userPin:'1234', adminPin:'7777'};
+      STATE.config = p.config || {proxyUrl: (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : window.location.href.split('?')[0]), itemcodeCsvUrl: DEFAULT_ITEMCODE_CSV_URL, salesOrderCsvUrl:DEFAULT_SALESORDER_CSV_URL, beginningPin: '1234', userPin:'1234', adminPin:'7777'};
       if (!STATE.config.itemcodeCsvUrl) STATE.config.itemcodeCsvUrl = DEFAULT_ITEMCODE_CSV_URL;
       STATE.config.proxyUrl = (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : window.location.href.split('?')[0]); // Always use current deployment URL
-      if (typeof STATE.config.salesOrderCsvUrl !== 'string') STATE.config.salesOrderCsvUrl = '';
+      if (!STATE.config.salesOrderCsvUrl) STATE.config.salesOrderCsvUrl = DEFAULT_SALESORDER_CSV_URL;
       if (!STATE.config.beginningPin) STATE.config.beginningPin = '1234';
       if (!STATE.config.userPin)  STATE.config.userPin  = '1234';
       if (!STATE.config.adminPin) STATE.config.adminPin = '7777';
@@ -1395,7 +1510,7 @@ function init() {
   if (document.getElementById('recDate')) document.getElementById('recDate').value = iso;
 
   if (document.getElementById('itemcodeCsvUrl')) document.getElementById('itemcodeCsvUrl').value = STATE.config.itemcodeCsvUrl || DEFAULT_ITEMCODE_CSV_URL;
-  if (document.getElementById('salesOrderCsvUrl')) document.getElementById('salesOrderCsvUrl').value = STATE.config.salesOrderCsvUrl || '';
+  if (document.getElementById('salesOrderCsvUrl')) document.getElementById('salesOrderCsvUrl').value = STATE.config.salesOrderCsvUrl || DEFAULT_SALESORDER_CSV_URL;
   if (document.getElementById('beginningPin'))   document.getElementById('beginningPin').value  = STATE.config.beginningPin || '1234';
   if (document.getElementById('adminPin'))       document.getElementById('adminPin').value      = STATE.config.adminPin || '7777';
 
@@ -3955,7 +4070,7 @@ function toggleSetupPanel() {
 function saveConfig() {
   STATE.config.proxyUrl         = (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : window.location.href.split('?')[0]); // Always use current deployment URL
   STATE.config.itemcodeCsvUrl   = document.getElementById('itemcodeCsvUrl').value.trim() || DEFAULT_ITEMCODE_CSV_URL;
-  STATE.config.salesOrderCsvUrl = (document.getElementById('salesOrderCsvUrl') ? document.getElementById('salesOrderCsvUrl').value.trim() : (STATE.config.salesOrderCsvUrl || ''));
+  STATE.config.salesOrderCsvUrl = (document.getElementById('salesOrderCsvUrl') ? document.getElementById('salesOrderCsvUrl').value.trim() : '') || DEFAULT_SALESORDER_CSV_URL;
   var pinRaw = (document.getElementById('beginningPin').value || '').replace(/[^0-9]/g, '').slice(0, 4);
   if (pinRaw.length === 4) STATE.config.beginningPin = pinRaw;
   else if (pinRaw.length > 0) { showToast('Beginning PIN must be exactly 4 digits — kept previous PIN', 'error'); }
@@ -4241,7 +4356,6 @@ var SO_GS_COLUMNS = [
   {label: 'Qty',       idx: 11, align: 'right', strong: true},             // Col L
   {label: 'Unit',      idx: 12},                                            // Col M
   {label: 'Customer',  idx: 5},                                            // Col F
-  {label: 'Urgency',   idx: 9,  type: 'urgency'},                          // Col J
   {label: 'Status',    idx: 10, type: 'status'},                           // Col K
   {label: 'Sales',     idx: 7},                                            // Col H
   {label: 'Action',    type: 'ready'}                                      // local-only Ready button
@@ -4315,7 +4429,7 @@ function _soGsToggleAutoRefresh(on) {
 //      live refreshes. (renderSalesOrderGsheet still clamps the page if the
 //      data shrinks below the current page boundary.)
 function _soGsAutoRefreshTick() {
-  var url = (STATE.config && STATE.config.salesOrderCsvUrl) ? STATE.config.salesOrderCsvUrl.trim() : '';
+  var url = ((STATE.config && STATE.config.salesOrderCsvUrl) ? STATE.config.salesOrderCsvUrl.trim() : '') || DEFAULT_SALESORDER_CSV_URL;
   if (!url) { _soGsUpdateLiveBadge('nourl'); return; }
   var busted = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
   _soGsUpdateLiveBadge('refreshing');
@@ -4385,7 +4499,7 @@ function _soGsTimeAgo(ts) {
 }
 
 function loadSalesOrderGsheet() {
-  var url = (STATE.config && STATE.config.salesOrderCsvUrl) ? STATE.config.salesOrderCsvUrl.trim() : '';
+  var url = ((STATE.config && STATE.config.salesOrderCsvUrl) ? STATE.config.salesOrderCsvUrl.trim() : '') || DEFAULT_SALESORDER_CSV_URL;
   if (!url) {
     showToast('Set the SALESORDER CSV URL in ⚙ Settings first', 'error');
     return;
@@ -5868,13 +5982,15 @@ function updateRoleBadge() {
   if (btn) {
     if (STATE._isAdmin) {
       btn.textContent = '🔒 Lock';
-      btn.style.background = '#E8F5E9';
-      btn.style.color = '#2E7D32';
+      btn.style.background = 'rgba(34,197,94,0.15)';
+      btn.style.color = '#86EFAC';
+      btn.style.borderColor = 'rgba(34,197,94,0.35)';
       btn.title = 'Currently in ADMIN mode. Click to drop back to USER.';
     } else {
       btn.textContent = '🔓 Admin';
-      btn.style.background = '#FFEBEE';
-      btn.style.color = '#C62828';
+      btn.style.background = 'rgba(239,68,68,0.1)';
+      btn.style.color = '#FCA5A5';
+      btn.style.borderColor = 'rgba(239,68,68,0.3)';
       btn.title = 'Switch to ADMIN mode (required for deletes). Stays unlocked until you close this tab.';
     }
   }
@@ -6524,9 +6640,9 @@ function parseSalesOrderRows(rows) {
     document.body.classList.toggle('design-mode', ON);
     var btn = document.getElementById('designModeBtn');
     if (btn) {
-      btn.textContent = ON ? '🛠 Design ON' : '🛠 Design';
-      btn.style.background = ON ? '#01579B' : '#E1F5FE';
-      btn.style.color      = ON ? '#fff'    : '#01579B';
+      btn.textContent = ON ? '🛠 Design ON 🔒' : '🛠 Design 🔒';
+      btn.style.background = ON ? 'rgba(1,87,155,0.25)' : '';
+      btn.style.color      = ON ? '#93C5FD' : '';
     }
     if (ON) {
       decorate();
