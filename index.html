@@ -351,7 +351,7 @@ tbody td{padding:9px 12px;color:#263238;vertical-align:middle}
 .split-modal{position:relative}
 
 /* Sales Orders (from GSheet) — Ready button + ready-row state */
-.so-ready-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:700;border-radius:6px;cursor:pointer;border:1.5px solid #2E7D32;background:#fff;color:#2E7D32;transition:all 0.15s ease;white-space:nowrap}
+.so-ready-btn{display:inline-flex;align-items:center;gap:3px;padding:4px 7px;font-size:11px;font-weight:700;border-radius:6px;cursor:pointer;border:1.5px solid #2E7D32;background:#fff;color:#2E7D32;transition:all 0.15s ease;white-space:nowrap}
 .so-ready-btn:hover{background:#E8F5E9}
 .so-ready-btn.is-ready{background:#2E7D32;color:#fff;border-color:#1B5E20}
 .so-ready-btn.is-ready:hover{background:#C62828;border-color:#C62828}
@@ -363,8 +363,10 @@ tr.so-marked-ready > td{background:#FFFDE7 !important;border-top:2px solid #FBC0
 tr.so-marked-ready > td:first-child{border-left:4px solid #FBC02D !important}
 tr.so-marked-ready > td:last-child{border-right:4px solid #FBC02D !important}
 tr.so-marked-ready > td.so-ready-row-keep{color:inherit !important}
-/* Action-cell buttons stack: READY on top, SERVED below */
-.so-action-stack{display:flex;flex-direction:column;gap:4px;align-items:stretch;min-width:96px}
+/* Action-cell buttons: side-by-side compact row */
+.so-action-stack{display:flex;flex-direction:row;gap:3px;align-items:center;min-width:0}
+.so-served-btn{display:inline-flex;align-items:center;padding:4px 7px;font-size:11px;font-weight:700;border-radius:6px;cursor:pointer;border:1.5px solid #2E7D32;background:#2E7D32;color:#fff;transition:all 0.15s ease;white-space:nowrap}
+.so-served-btn:hover{background:#1B5E20;border-color:#1B5E20}
 .so-ready-btn.is-ready{background:#FBC02D;color:#5D4037;border-color:#F9A825}
 .so-ready-btn.is-ready:hover{background:#F9A825;border-color:#F57F17;color:#fff}
 .so-ready-btn.is-ready:hover::after{content:' (undo)';font-weight:600}
@@ -479,7 +481,7 @@ html,body{height:100%;overflow:hidden}
 .app-shell{display:flex;height:100vh;overflow:hidden}
 
 .sidebar{
-  width:220px;min-width:220px;flex-shrink:0;
+  width:176px;min-width:176px;flex-shrink:0;
   background:#111827;
   display:flex;flex-direction:column;
   height:100vh;overflow-y:auto;overflow-x:hidden;
@@ -566,7 +568,7 @@ nav#mainNav{
 header{display:none!important}
 
 @media(max-width:700px){
-  .sidebar{width:180px;min-width:180px}
+  .sidebar{width:144px;min-width:144px}
   .nav-tab{padding:9px 12px!important;font-size:12px!important}
 }
 @media(max-width:500px){
@@ -609,7 +611,7 @@ header{display:none!important}
 
   <nav id="mainNav">
     <button class="nav-tab active" onclick="switchTab('stocks')"><span class="tab-icon">■</span>Stocks</button>
-    <button class="nav-tab" onclick="switchTab('beginning')"><span class="tab-icon">★</span>Beginning</button>
+    <button class="nav-tab" id="navTab-beginning" onclick="switchTab('beginning')" style="display:none"><span class="tab-icon">★</span>Beginning</button>
     <button class="nav-tab" onclick="switchTab('withdraw')"><span class="tab-icon">↗</span>Withdraw</button>
     <button class="nav-tab" onclick="switchTab('salesorder')"><span class="tab-icon">🛒</span>Sales Order</button>
     <button class="nav-tab" onclick="switchTab('served')"><span class="tab-icon">✓</span>Served</button>
@@ -791,19 +793,9 @@ header{display:none!important}
     </label>
     <button class="btn-secondary" onclick="clearSoGsFilter()" style="padding:9px 16px;font-size:13px">Clear</button>
     <button class="btn-primary" id="soGsLoadBtn" onclick="loadSalesOrderGsheet()" style="padding:9px 16px;font-size:13px" title="Pull the latest SALESORDER tab CSV">⏬ Load / Refresh</button>
+    <span id="soGsLiveBadge" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;color:#2E7D32;gap:4px"></span>
   </div>
   <!-- Live auto-refresh status bar -->
-  <div data-region="SO.liveBar" style="display:flex;gap:14px;margin-bottom:12px;flex-wrap:wrap;align-items:center;padding:7px 12px;background:#F1F8E9;border:1px solid #C8E6C9;border-radius:8px;font-size:12px">
-    <span id="soGsLiveBadge" style="display:inline-flex;align-items:center;font-weight:700;color:#2E7D32" title="Auto-refresh status">
-      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#90A4AE;margin-right:6px"></span>Auto-refresh idle
-    </span>
-    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;color:#33691E;font-weight:600" title="When ON, the SALESORDER CSV is silently re-pulled every 15 seconds so new gsheet rows show up without clicking Refresh">
-      <input type="checkbox" id="soGsAutoRefreshToggle" checked onchange="_soGsToggleAutoRefresh(this.checked)">
-      <span>Live (auto-refresh every 15s)</span>
-    </label>
-    <span id="soGsTodayHint" style="margin-left:auto;color:#558B2F;font-style:italic"></span>
-  </div>
-
   <div class="card">
     <div class="table-wrap">
       <table id="soGsTable">
@@ -830,10 +822,6 @@ header{display:none!important}
   <div class="section-header">
     <div class="section-title">✓ Served Orders</div>
     <span class="badge" id="servedBadge" style="background:#C8E6C9;color:#1B5E20">0 records</span>
-  </div>
-
-  <div data-region="SERVED.info" style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1B5E20;line-height:1.55">
-    <strong>✓ Sales-order rows that have been marked Served</strong> from the Sales Order tab. Each row here is also written to the <strong>SERVED</strong> tab in the JHONG BACKEND gsheet. Clicking <em>Clear</em> on a row removes it from this webapp only — the gsheet SERVED tab is not touched.
   </div>
 
   <div data-region="SERVED.toolbar" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
@@ -1108,6 +1096,36 @@ header{display:none!important}
         <button class="btn-secondary" onclick="clear3MYardsForm()">Clear</button>
       </div>
     </div>
+
+  <div class="section-header" style="margin-top:8px">
+    <div class="section-title" style="font-size:13px">3M Roll Yard Ledger</div>
+    <span class="badge" id="threemYardsBadge">0 rolls</span>
+  </div>
+  <div style="display:flex;gap:10px;margin:6px 0 12px;flex-wrap:wrap">
+    <input class="form-input" id="tmyRollFilter" placeholder="Filter by core no., item ID, description..." oninput="renderTmyRollFilter()" style="flex:1;min-width:220px">
+    <button class="btn-secondary" onclick="document.getElementById('tmyRollFilter').value='';renderTmyRollFilter()">Clear</button>
+  </div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Core No.</th>
+            <th>Item ID</th>
+            <th>Description</th>
+            <th>Width</th>
+            <th style="text-align:right">Qty (Yards)</th>
+            <th style="text-align:right">Withdrawn</th>
+            <th style="text-align:right">Available</th>
+            <th style="width:110px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="threemYardsBody">
+          <tr><td colspan="8"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">No rolls yet — add one above.</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
   </div>
 
   <!-- ---------- Sub-panel: Withdraw Yards ---------- -->
@@ -1156,13 +1174,7 @@ header{display:none!important}
         <button class="btn-secondary" onclick="clear3MYardsWithdrawForm()">Clear</button>
       </div>
     </div>
-  </div>
 
-  <!-- ============================================================
-       Withdrawal Log block — promoted OUT of #subPanel-tmy-withdraw
-       in v3.33 so the section header, #tmyFilter, and the log card
-       remain visible regardless of which sub-tab is active.
-       ============================================================ -->
   <div class="section-header" style="margin-top:8px">
     <div class="section-title" style="font-size:13px">Withdrawal Log</div>
     <span class="badge" id="tmyWdLogBadge" style="background:#FFF3E0;color:#E65100">0 entries</span>
@@ -1192,6 +1204,7 @@ header{display:none!important}
         </tbody>
       </table>
     </div>
+  </div>
   </div>
 </div>
 
@@ -3113,36 +3126,40 @@ function _updateReceivedFormButtons() {
 // Available is computed = Qty (Yards) − Withdrawn.
 
 function render3MYards() {
-  // The roll-ledger table was removed in v3.32, but the section-header badge
-  // still shows the total roll count, so we always update it first — BEFORE
-  // any early-return when the table body is missing.
-  var allRolls = (STATE.threeMYards || []);
-  var hdrBadge = document.getElementById('threemYardsBadge');
-  if (hdrBadge) hdrBadge.textContent = allRolls.length + (allRolls.length === 1 ? ' roll' : ' rolls');
+  renderTmyRollFilter();
+}
 
+function clear3MYardsFilter() {
+  var f = document.getElementById('tmyFilter');
+  if (f) f.value = '';
+  renderTmyWithdrawals();
+  render3MYards();
+}
+
+// Filter helper for the roll ledger search box in Add/Edit Roll sub-tab
+function renderTmyRollFilter() {
+  var q = (document.getElementById('tmyRollFilter') ? document.getElementById('tmyRollFilter').value : '').toLowerCase().trim();
   var body = document.getElementById('threemYardsBody');
-  if (!body) return;
-  // (#tmyFilter no longer filters this table — it filters the withdrawal log
-  // via renderTmyWithdrawals(). When the table body still exists we keep the
-  // legacy filter behavior here for backward compatibility.)
-  var q = (document.getElementById('tmyFilter') ? document.getElementById('tmyFilter').value : '').toLowerCase().trim();
-  var rows = allRolls.filter(function(r){
-    if (!q) return true;
+  var badge = document.getElementById('threemYardsBadge');
+  var allRolls = STATE.threeMYards || [];
+  var rows = !q ? allRolls : allRolls.filter(function(r){
     return (r.coreNo||'').toLowerCase().indexOf(q) !== -1
         || (r.itemId||'').toLowerCase().indexOf(q) !== -1
         || (r.itemDesc||'').toLowerCase().indexOf(q) !== -1
         || (r.width||'').toLowerCase().indexOf(q) !== -1;
   });
+  if (badge) badge.textContent = rows.length + (rows.length === 1 ? ' roll' : ' rolls');
+  if (!body) return;
   if (!rows.length) {
     body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">'
-      + ((STATE.threeMYards||[]).length ? 'No rolls match your filter.' : 'No 3M Yards rolls yet — add one above.')
+      + (allRolls.length ? 'No rolls match your filter.' : 'No rolls yet — add one above.')
       + '</div></div></td></tr>';
     return;
   }
   var html = '';
   rows.forEach(function(r){
-    var qty = parseFloat(r.qtyYards)||0;
-    var wd  = parseFloat(r.withdrawn)||0;
+    var qty   = parseFloat(r.qtyYards)||0;
+    var wd    = parseFloat(r.withdrawn)||0;
     var avail = qty - wd;
     var availColor = avail <= 0 ? '#C62828' : (avail < qty * 0.2 ? '#E65100' : '#2E7D32');
     var safeCore = escAttr(r.coreNo);
@@ -3158,21 +3175,11 @@ function render3MYards() {
          + '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFF8E1;color:#E65100;border-color:#FFE082;margin-right:4px" onclick="edit3MYardsRoll(\''+safeCore+'\')">✎ Edit</button>'
          + (STATE._isAdmin
               ? '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFEBEE;color:#C62828;border-color:#FFCDD2" onclick="delete3MYardsRoll(\''+safeCore+'\')">🗑 Del</button>'
-              : '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#ECEFF1;color:#90A4AE;border-color:#CFD8DC;cursor:not-allowed" disabled title="Only ADMIN can delete rolls. Click 🔓 Admin in the header to unlock.">🔒 Del</button>')
+              : '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#ECEFF1;color:#90A4AE;border-color:#CFD8DC;cursor:not-allowed" disabled title="Only ADMIN can delete rolls.">🔒 Del</button>')
          + '</td>'
          + '</tr>';
   });
   body.innerHTML = html;
-}
-
-function clear3MYardsFilter() {
-  var f = document.getElementById('tmyFilter');
-  if (f) f.value = '';
-  // The filter now drives the withdrawal log, not the (removed) roll ledger.
-  // We still call render3MYards() to refresh the rolls badge in the section
-  // header, but the filter input itself is consumed by renderTmyWithdrawals().
-  renderTmyWithdrawals();
-  render3MYards();
 }
 
 function save3MYardsRoll() {
@@ -3360,6 +3367,8 @@ function switchTmySubTab(which) {
     renderTmyWithdrawals();
     var c = document.getElementById('tmyWdCoreNo');
     if (c) setTimeout(function(){ c.focus(); }, 30);
+  } else {
+    renderTmyRollFilter();
   }
 }
 
@@ -4351,8 +4360,8 @@ var SO_GS_COLUMNS = [
   {label: 'Job Order', idx: 2},                                            // Col C
   {label: 'Item ID',   idx: 17, type: 'itemid'},                           // Col R
   {label: 'Item Description', type: 'itemdesc'},                          // resolved from ITEMCODE
-  {label: 'Width',     idx: 13, align: 'right'},                           // Col N
-  {label: 'Length',    idx: 15, align: 'right'},                           // Col P
+  {label: 'W',         idx: 13, align: 'right', unitIdx: 14},               // Col N + unit O
+  {label: 'L',         idx: 15, align: 'right', unitIdx: 16},               // Col P + unit Q
   {label: 'Qty',       idx: 11, align: 'right', strong: true},             // Col L
   {label: 'Unit',      idx: 12},                                            // Col M
   {label: 'Customer',  idx: 5},                                            // Col F
@@ -4920,7 +4929,7 @@ function _soGsRenderCell(spec, row) {
     if (served) {
       var ts = _soGsFmtReadyAt(served.readyAt);
       return '<td class="so-ready-row-keep" style="text-align:center;white-space:nowrap">'
-        + '<button type="button" class="so-served-btn" style="background:#2E7D32;border-color:#1B5E20" '
+        + '<button type="button" class="so-served-btn" '
         + 'onclick="markSoGsRowServed(\''+safeKey+'\')" '
         + 'title="Marked Served '+escapeHtml(ts)+' — click to undo">✓ Served</button>'
         + '<div style="font-size:10px;color:#558B2F;margin-top:3px">'+escapeHtml(ts)+'</div>'
@@ -4933,7 +4942,7 @@ function _soGsRenderCell(spec, row) {
     // SERVED →  : moves the row to the SERVED tab in the gsheet.
     var readyMs   = marked && marked.markedAt ? Date.parse(marked.markedAt) : 0;
     var readyAgo  = readyMs ? _soGsFmtReadyAt(marked.markedAt) : '';
-    var readyLbl  = marked ? '★ Ready ✓' : '★ READY';
+    var readyLbl  = marked ? '★✓' : '★';
     var readyTtl  = marked
       ? 'Marked Ready ' + readyAgo + ' — click to unmark'
       : 'Highlight this row as READY (does NOT send to SERVED tab)';
@@ -4944,7 +4953,7 @@ function _soGsRenderCell(spec, row) {
       +       'title="'+escapeHtml(readyTtl)+'">'+readyLbl+'</button>'
       +     '<button type="button" class="so-served-btn" '
       +       'onclick="markSoGsRowServed(\''+safeKey+'\')" '
-      +       'title="Move this order to the SERVED tab in the gsheet">SERVED →</button>'
+      +       'title="Move this order to the SERVED tab in the gsheet">✓ Srv</button>'
       +   '</div>'
       +   (marked ? '<div style="font-size:10px;color:#F57F17;margin-top:3px;font-weight:600">marked '+escapeHtml(readyAgo)+'</div>' : '')
       + '</td>';
@@ -5003,6 +5012,13 @@ function _soGsRenderCell(spec, row) {
       break;
     default:
       content = val ? escapeHtml(val) : '—';
+  }
+
+  // Append inline unit (e.g. "in", "yd") from an adjacent CSV column
+  if (spec.unitIdx !== undefined) {
+    var unitRaw = row.cols[spec.unitIdx];
+    var unitVal = unitRaw ? String(unitRaw).trim() : '';
+    if (unitVal) content = (val ? escapeHtml(val) : '—') + '&nbsp;<span style="font-size:10px;color:#78909C;font-weight:400">' + escapeHtml(unitVal) + '</span>';
   }
 
   if (spec.align)  styleParts.push('text-align:'+spec.align);
