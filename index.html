@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_2.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_3.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -476,6 +476,62 @@ body.design-mode .design-tip {
 }
 
 /* ============================================================
+   AUDIT / REPORTS TAB
+   ============================================================ */
+.audit-toolbar{background:#fff;border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.audit-section-title{font-size:13px;font-weight:700;color:#37474F;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.audit-ledger-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.audit-ledger-btn{padding:14px 16px;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;text-align:left;transition:all 0.18s;font-family:inherit}
+.audit-ledger-btn:hover{border-color:#1565C0;background:#E3F2FD}
+.audit-ledger-btn.active{border-color:#1565C0;background:#E3F2FD;box-shadow:0 0 0 3px rgba(21,101,192,0.15)}
+.audit-ledger-btn .alb-icon{font-size:20px;margin-bottom:6px}
+.audit-ledger-btn .alb-title{font-size:13px;font-weight:700;color:#1a1a2e;line-height:1.2}
+.audit-ledger-btn .alb-sub{font-size:11px;color:#78909C;margin-top:3px}
+.audit-ledger-btn.active .alb-title{color:#1565C0}
+.audit-report-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-bottom:14px}
+.audit-ropt{display:flex;align-items:center;gap:9px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;background:#fff;transition:all 0.15s;font-family:inherit;font-size:13px;font-weight:500;color:#455A64}
+.audit-ropt:hover{border-color:#1565C0;background:#E3F2FD;color:#1565C0}
+.audit-ropt.active{border-color:#1565C0;background:#E3F2FD;color:#1565C0;font-weight:700}
+.audit-ropt-icon{font-size:16px;flex-shrink:0}
+.audit-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px}
+.audit-filter-group{display:flex;flex-direction:column;gap:4px}
+.audit-filter-label{font-size:11px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:0.5px}
+.audit-filter-input{padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:#1a1a2e;background:#F8FAFC;transition:all 0.2s;font-family:inherit}
+.audit-filter-input:focus{outline:none;border-color:#1565C0;background:#fff;box-shadow:0 0 0 3px rgba(21,101,192,0.1)}
+.audit-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding-top:14px;border-top:1px solid var(--border);margin-top:14px}
+.btn-audit-run{background:#1565C0;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all 0.2s;font-family:inherit}
+.btn-audit-run:hover{background:#0D47A1;transform:translateY(-1px);box-shadow:0 4px 12px rgba(21,101,192,0.35)}
+.btn-audit-run:disabled{background:#90CAF9;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-audit-excel{background:#fff;color:#2E7D32;border:1.5px solid #2E7D32;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all 0.2s;font-family:inherit}
+.btn-audit-excel:hover{background:#E8F5E9}
+.btn-audit-email{background:#fff;color:#1565C0;border:1.5px solid #1565C0;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all 0.2s;font-family:inherit}
+.btn-audit-email:hover{background:#E3F2FD}
+.audit-result-wrap{background:#fff;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;margin-top:6px}
+.audit-result-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:linear-gradient(135deg,#E3F2FD 0%,#EDE7F6 100%);border-bottom:1px solid #BBDEFB}
+.audit-result-title{font-size:14px;font-weight:700;color:#1565C0}
+.audit-result-meta{font-size:12px;color:#78909C}
+.audit-summary-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);background:#F8FAFC}
+.audit-stat{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px}
+.audit-stat-lbl{font-size:10px;font-weight:700;color:#78909C;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px}
+.audit-stat-val{font-size:20px;font-weight:700;color:#1565C0}
+.audit-stat-sub{font-size:10px;color:#90A4AE;margin-top:2px}
+.audit-table-wrap{overflow-x:auto;max-height:520px;overflow-y:auto}
+.audit-table-wrap table thead th{background:#E3F2FD;color:#1565C0;border-bottom:2px solid #90CAF9;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap;padding:9px 12px;position:sticky;top:0;z-index:2}
+.audit-pill-received{background:#E8F5E9;color:#2E7D32;display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.audit-pill-withdrawn{background:#FFEBEE;color:#C62828;display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.audit-pill-balance{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.audit-empty{text-align:center;padding:48px 20px;color:#90A4AE}
+.audit-no-selection{text-align:center;padding:60px 20px;color:#90A4AE}
+.audit-no-selection .ans-icon{font-size:48px;margin-bottom:12px;opacity:0.4}
+.audit-no-selection .ans-title{font-size:15px;font-weight:600;color:#607D8B;margin-bottom:6px}
+.audit-no-selection .ans-sub{font-size:13px}
+.audit-email-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center}
+.audit-email-modal.show{display:flex}
+.audit-email-box{background:#fff;border-radius:14px;padding:24px;width:420px;max-width:95vw;box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+.audit-email-box h3{font-size:15px;font-weight:700;color:#1565C0;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.audit-email-note{font-size:12px;color:#607D8B;margin-top:14px;background:#E3F2FD;border-radius:6px;padding:8px 12px;line-height:1.5}
+
+/* ============================================================
    SIDEBAR LAYOUT
    ============================================================ */
 html,body{height:100%;overflow:hidden}
@@ -594,7 +650,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">7/8</span>
+  <span class="sync-progress" id="syncIndicatorProgress">6/8</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -620,6 +676,7 @@ header{display:none!important}
     <button class="nav-tab" onclick="switchTab(&#39;threemyards&#39;)"><span class="tab-icon">▥</span>3M Yards</button>
     <button class="nav-tab" onclick="switchTab(&#39;partialrolls&#39;)"><span class="tab-icon">⊞</span>Partial Rolls</button>
     <button class="nav-tab" onclick="switchTab(&#39;search&#39;)"><span class="tab-icon">⚲</span>Search</button>
+    <button class="nav-tab" onclick="switchTab(&#39;audit&#39;)"><span class="tab-icon">📊</span>Audit / Reports</button>
   </nav>
 
   <div class="sidebar-footer">
@@ -1408,9 +1465,130 @@ header{display:none!important}
   </div>
 </div>
 
+<!-- ============ AUDIT / REPORTS TAB ============ -->
+<div class="tab-panel" id="tab-audit">
+  <div class="audit-toolbar">
+    <!-- STEP 1: SELECT LEDGER -->
+    <div class="audit-section-title">📂 Step 1 — Select Stock Ledger</div>
+    <div class="audit-ledger-grid">
+      <button class="audit-ledger-btn active" id="auditLedger-main" onclick="auditSelectLedger(&#39;main&#39;)">
+        <div class="alb-icon">🗂</div>
+        <div class="alb-title">Main Stocks</div>
+        <div class="alb-sub">Rolls &amp; PC (BEGINNING + RECEIVED + WITHDRAWAL)</div>
+      </button>
+      <button class="audit-ledger-btn" id="auditLedger-yards" onclick="auditSelectLedger(&#39;yards&#39;)">
+        <div class="alb-icon">📏</div>
+        <div class="alb-title">Yards Stock</div>
+        <div class="alb-sub">3M Yards rolls (YARDSRECEIVED + YARDSWITHDRAWN)</div>
+      </button>
+      <button class="audit-ledger-btn" id="auditLedger-partial" onclick="auditSelectLedger(&#39;partial&#39;)">
+        <div class="alb-icon">✂️</div>
+        <div class="alb-title">Partial Rolls Stock</div>
+        <div class="alb-sub">Partial roll records (PARTIALROLLS + PARTIALWITHDRAW)</div>
+      </button>
+    </div>
+
+    <!-- STEP 2: REPORT TYPE -->
+    <div class="audit-section-title">📋 Step 2 — Report Type</div>
+    <div class="audit-report-opts">
+      <button class="audit-ropt active" id="auditRopt-balance" onclick="auditSelectReport(&#39;balance&#39;)">
+        <span class="audit-ropt-icon">💼</span> Current Balance on Hand
+      </button>
+      <button class="audit-ropt" id="auditRopt-withdrawal" onclick="auditSelectReport(&#39;withdrawal&#39;)">
+        <span class="audit-ropt-icon">↗</span> Withdrawal History Only
+      </button>
+      <button class="audit-ropt" id="auditRopt-received" onclick="auditSelectReport(&#39;received&#39;)">
+        <span class="audit-ropt-icon">↘</span> Received History Only
+      </button>
+      <button class="audit-ropt" id="auditRopt-complete" onclick="auditSelectReport(&#39;complete&#39;)">
+        <span class="audit-ropt-icon">📜</span> Complete Ledger History
+      </button>
+    </div>
+
+    <!-- STEP 3: FILTERS -->
+    <div class="audit-section-title">🔎 Step 3 — Filters <span style="font-size:11px;font-weight:500;color:#90A4AE;text-transform:none;letter-spacing:0">(all optional)</span></div>
+    <div class="audit-filters">
+      <div class="audit-filter-group">
+        <label class="audit-filter-label">Date From</label>
+        <input type="date" class="audit-filter-input" id="auditDateFrom">
+      </div>
+      <div class="audit-filter-group">
+        <label class="audit-filter-label">Date To</label>
+        <input type="date" class="audit-filter-input" id="auditDateTo">
+      </div>
+      <div class="audit-filter-group">
+        <label class="audit-filter-label">Item Code (contains)</label>
+        <input type="text" class="audit-filter-input" id="auditFilterCode" placeholder="e.g. NR-1001">
+      </div>
+      <div class="audit-filter-group">
+        <label class="audit-filter-label">Description (contains)</label>
+        <input type="text" class="audit-filter-input" id="auditFilterDesc" placeholder="e.g. BLACK">
+      </div>
+      <div class="audit-filter-group">
+        <label class="audit-filter-label">Transaction Type</label>
+        <select class="audit-filter-input" id="auditFilterTxnType">
+          <option value="all">All Transactions</option>
+          <option value="received">Received / Stock-In</option>
+          <option value="withdrawal">Withdrawal / Stock-Out</option>
+          <option value="beginning">Beginning Balance</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="audit-actions">
+      <button class="btn-audit-run" id="auditRunBtn" onclick="auditGenerate()">
+        ▶ Generate Report
+      </button>
+      <button class="btn-audit-excel" id="auditExcelBtn" onclick="auditExportExcel()" style="display:none">
+        📥 Export to Excel (CSV)
+      </button>
+      <button class="btn-audit-email" id="auditEmailBtn" onclick="auditOpenEmailModal()" style="display:none">
+        ✉ Send via Email
+      </button>
+      <button class="btn-secondary" onclick="auditClearFilters()" style="padding:10px 16px;font-size:13px">Clear Filters</button>
+    </div>
+  </div>
+
+  <!-- RESULTS AREA -->
+  <div id="auditResultArea">
+    <div class="audit-no-selection">
+      <div class="ans-icon">📊</div>
+      <div class="ans-title">Select a ledger and report type, then click Generate</div>
+      <div class="ans-sub">Reports are built from locally-synced data — click ↻ Sync Now to refresh first</div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /main-area -->
 </div><!-- /app-shell -->
+
+<!-- ============ AUDIT EMAIL MODAL ============ -->
+<div class="audit-email-modal" id="auditEmailModal" onclick="if(event.target===this)auditCloseEmailModal()">
+  <div class="audit-email-box">
+    <h3>✉ Send Report via Email</h3>
+    <div class="audit-filter-group" style="margin-bottom:12px">
+      <label class="audit-filter-label">Recipient Email</label>
+      <input type="email" class="audit-filter-input" id="auditEmailTo" placeholder="someone@example.com">
+    </div>
+    <div class="audit-filter-group" style="margin-bottom:12px">
+      <label class="audit-filter-label">Subject</label>
+      <input type="text" class="audit-filter-input" id="auditEmailSubject" placeholder="JHONG Inventory Report">
+    </div>
+    <div class="audit-filter-group" style="margin-bottom:14px">
+      <label class="audit-filter-label">Message (optional)</label>
+      <textarea class="audit-filter-input" id="auditEmailBody" rows="3" placeholder="Please find the attached inventory report..." style="resize:vertical"></textarea>
+    </div>
+    <div class="audit-email-note">
+      ℹ️ This will open your default email client (mailto:) with the report data pre-filled. For automated email delivery, an Apps Script email action can be wired up by the developer.
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn-audit-email" onclick="auditSendEmail()">✉ Open Email</button>
+      <button class="btn-secondary" onclick="auditCloseEmailModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- ITEM PICKER (Search) — fixed overlay so it is never clipped -->
 <div class="item-picker" id="itemPicker">
@@ -5395,7 +5573,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
   document.getElementById('tab-'+tab).classList.add('active');
-  var tabs = ['stocks','beginning','withdraw','salesorder','served','received','threemyards','partialrolls','search'];
+  var tabs = ['stocks','beginning','withdraw','salesorder','served','received','threemyards','partialrolls','search','audit'];
   var idx = tabs.indexOf(tab);
   if (idx >= 0) document.querySelectorAll('.nav-tab')[idx].classList.add('active');
   if (tab === 'withdraw') setTimeout(function(){ var el=document.getElementById('wItemCode'); if (el) el.focus(); }, 50);
@@ -5434,6 +5612,10 @@ function switchTab(tab) {
   }
   if (tab === 'served') {
     try { renderServedTab(); } catch(e){}
+  }
+  if (tab === 'audit') {
+    // Reset result area if nothing has been generated yet
+    try { auditOnTabActivate(); } catch(e){}
   }
   if (tab !== 'search') hidePicker();
 }
@@ -8411,6 +8593,503 @@ function parseSalesOrderRows(rows) {
 }
 
 
+
+// =====================================================================
+//  AUDIT / REPORTS TAB
+// =====================================================================
+
+var _auditState = {
+  ledger: 'main',       // 'main' | 'yards' | 'partial'
+  report: 'balance',    // 'balance' | 'withdrawal' | 'received' | 'complete'
+  lastRows: [],         // last built report rows for export
+  lastTitle: '',
+  lastGenerated: null
+};
+
+function auditOnTabActivate() {
+  // Nothing to re-render — state is preserved across tab switches.
+  // Just ensure export buttons match current state.
+  var hasData = _auditState.lastRows && _auditState.lastRows.length > 0;
+  var exBtn = document.getElementById('auditExcelBtn');
+  var emBtn = document.getElementById('auditEmailBtn');
+  if (exBtn) exBtn.style.display = hasData ? 'flex' : 'none';
+  if (emBtn) emBtn.style.display = hasData ? 'flex' : 'none';
+}
+
+function auditSelectLedger(ledger) {
+  _auditState.ledger = ledger;
+  document.querySelectorAll('.audit-ledger-btn').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.getElementById('auditLedger-'+ledger);
+  if (btn) btn.classList.add('active');
+  // Adjust transaction type options based on ledger
+  _auditUpdateTxnOptions();
+}
+
+function auditSelectReport(report) {
+  _auditState.report = report;
+  document.querySelectorAll('.audit-ropt').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.getElementById('auditRopt-'+report);
+  if (btn) btn.classList.add('active');
+  _auditUpdateTxnOptions();
+}
+
+function _auditUpdateTxnOptions() {
+  var sel = document.getElementById('auditFilterTxnType');
+  if (!sel) return;
+  // For 'balance' report, txn type filter is irrelevant
+  sel.disabled = (_auditState.report === 'balance');
+  if (_auditState.report === 'withdrawal') sel.value = 'withdrawal';
+  else if (_auditState.report === 'received') sel.value = 'received';
+  else if (_auditState.report === 'balance') sel.value = 'all';
+}
+
+function auditClearFilters() {
+  var ids = ['auditDateFrom','auditDateTo','auditFilterCode','auditFilterDesc'];
+  ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  var sel = document.getElementById('auditFilterTxnType');
+  if (sel) { sel.value = 'all'; sel.disabled = false; }
+}
+
+// ---- Main generate entry point ----
+function auditGenerate() {
+  var ledger = _auditState.ledger;
+  var report = _auditState.report;
+
+  var dateFrom = (document.getElementById('auditDateFrom')||{}).value || '';
+  var dateTo   = (document.getElementById('auditDateTo')||{}).value   || '';
+  var codeQ    = ((document.getElementById('auditFilterCode')||{}).value || '').trim().toLowerCase();
+  var descQ    = ((document.getElementById('auditFilterDesc')||{}).value || '').trim().toLowerCase();
+  var txnType  = (document.getElementById('auditFilterTxnType')||{}).value || 'all';
+
+  // ---- Build rows depending on ledger + report type ----
+  var rows = [];
+  var title = '';
+
+  if (ledger === 'main') {
+    title = 'Main Stocks (Rolls & PC)';
+    if (report === 'balance') {
+      rows = _auditBuildMainBalance(codeQ, descQ);
+    } else {
+      rows = _auditBuildMainHistory(report, dateFrom, dateTo, codeQ, descQ, txnType);
+    }
+  } else if (ledger === 'yards') {
+    title = 'Yards Stock (3M)';
+    if (report === 'balance') {
+      rows = _auditBuildYardsBalance(codeQ, descQ);
+    } else {
+      rows = _auditBuildYardsHistory(report, dateFrom, dateTo, codeQ, descQ, txnType);
+    }
+  } else if (ledger === 'partial') {
+    title = 'Partial Rolls Stock';
+    if (report === 'balance') {
+      rows = _auditBuildPartialBalance(codeQ, descQ);
+    } else {
+      rows = _auditBuildPartialHistory(report, dateFrom, dateTo, codeQ, descQ, txnType);
+    }
+  }
+
+  var reportLabels = {balance:'Balance on Hand', withdrawal:'Withdrawal History', received:'Received History', complete:'Complete Ledger'};
+  var fullTitle = title + ' — ' + (reportLabels[report]||report);
+  _auditState.lastRows = rows;
+  _auditState.lastTitle = fullTitle;
+  _auditState.lastGenerated = new Date();
+
+  _auditRender(rows, fullTitle, report, ledger);
+
+  var exBtn = document.getElementById('auditExcelBtn');
+  var emBtn = document.getElementById('auditEmailBtn');
+  if (exBtn) exBtn.style.display = rows.length ? 'flex' : 'none';
+  if (emBtn) emBtn.style.display = rows.length ? 'flex' : 'none';
+}
+
+// ---- MAIN STOCKS: Balance ----
+function _auditBuildMainBalance(codeQ, descQ) {
+  var rows = [];
+  (STATE.items || []).forEach(function(it) {
+    if (codeQ && it.code.toLowerCase().indexOf(codeQ) === -1) return;
+    if (descQ && (it.desc||'').toLowerCase().indexOf(descQ) === -1) return;
+    var origQty = it.origQty || 0;
+    var beg = (STATE.beginning && STATE.beginning[it.code]) ? (parseFloat((STATE.beginning[it.code]).qty)||0) : 0;
+    var rec = 0; (STATE.received||[]).forEach(function(r){ if(r.itemCode===it.code) rec += parseFloat(r.qty)||0; });
+    var wdh = 0; (STATE.withdrawals||[]).forEach(function(w){ if(w.itemCode===it.code) wdh += parseFloat(w.qty)||0; });
+    var balance = origQty + beg + rec - wdh;
+    rows.push({
+      date: '—',
+      txnType: 'BALANCE',
+      code: it.code,
+      desc: it.desc || '',
+      size: it.size || '',
+      opening: origQty,
+      beginning: beg,
+      received: rec,
+      withdrawn: wdh,
+      balance: balance,
+      ref: '—',
+      supplier: '—',
+      customer: '—',
+      remarks: '—'
+    });
+  });
+  rows.sort(function(a,b){ return a.code.localeCompare(b.code); });
+  return rows;
+}
+
+// ---- MAIN STOCKS: History ----
+function _auditBuildMainHistory(report, dateFrom, dateTo, codeQ, descQ, txnType) {
+  var rows = [];
+  var includeReceived   = report === 'received' || report === 'complete' || txnType === 'received'   || txnType === 'all';
+  var includeWithdrawal = report === 'withdrawal'|| report === 'complete' || txnType === 'withdrawal'  || txnType === 'all';
+  var includeBeginning  = report === 'complete' && (txnType === 'all' || txnType === 'beginning');
+
+  function _passDateCode(date, code, desc) {
+    if (dateFrom && date && date < dateFrom) return false;
+    if (dateTo   && date && date > dateTo)   return false;
+    if (codeQ && (code||'').toLowerCase().indexOf(codeQ) === -1) return false;
+    if (descQ && (desc||'').toLowerCase().indexOf(descQ) === -1) return false;
+    return true;
+  }
+
+  if (includeReceived) {
+    (STATE.received||[]).forEach(function(r) {
+      var d = _auditIsoDate(r.date);
+      if (!_passDateCode(d, r.itemCode, r.desc)) return;
+      rows.push({ date: d||'—', txnType:'RECEIVED', code:r.itemCode||'', desc:r.desc||'', size:r.size||'', qty:r.qty||0, ref:r.mrrNo||'—', supplier:r.supplier||'—', customer:'—', remarks:r.remarks||'—' });
+    });
+  }
+  if (includeWithdrawal) {
+    (STATE.withdrawals||[]).forEach(function(w) {
+      var d = _auditIsoDate(w.date);
+      if (!_passDateCode(d, w.itemCode, w.desc)) return;
+      rows.push({ date: d||'—', txnType:'WITHDRAWAL', code:w.itemCode||'', desc:w.desc||'', size:w.size||'', qty:w.qty||0, ref:w.withdrawalNo||'—', supplier:'—', customer:w.customer||'—', remarks:w.remarks||'—' });
+    });
+  }
+  if (includeBeginning) {
+    Object.keys(STATE.beginning||{}).forEach(function(code) {
+      var b = STATE.beginning[code];
+      var it = (STATE.items||[]).find(function(i){ return i.code===code; }) || {};
+      if (codeQ && code.toLowerCase().indexOf(codeQ) === -1) return;
+      if (descQ && (it.desc||'').toLowerCase().indexOf(descQ) === -1) return;
+      rows.push({ date: b.date||'—', txnType:'BEGINNING', code:code, desc:it.desc||'', size:it.size||'', qty:parseFloat(b.qty)||0, ref:'—', supplier:'—', customer:'—', remarks:b.notes||'—' });
+    });
+  }
+  rows.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  return rows;
+}
+
+// ---- YARDS: Balance ----
+function _auditBuildYardsBalance(codeQ, descQ) {
+  var rolls = STATE.threeMYards || [];
+  var rows = [];
+  rolls.forEach(function(r) {
+    if (codeQ && (r.itemId||'').toLowerCase().indexOf(codeQ) === -1) return;
+    if (descQ && (r.itemDesc||'').toLowerCase().indexOf(descQ) === -1) return;
+    var remaining = (parseFloat(r.qtyYards)||0) - (parseFloat(r.withdrawn)||0);
+    rows.push({ date:'—', txnType:'BALANCE', code:r.coreNo||'', desc:r.itemDesc||r.itemId||'', size:r.width||'', received:parseFloat(r.qtyYards)||0, withdrawn:parseFloat(r.withdrawn)||0, balance:remaining, ref:r.itemId||'—', supplier:'3M', customer:'—', remarks:'—' });
+  });
+  rows.sort(function(a,b){ return a.code.localeCompare(b.code); });
+  return rows;
+}
+
+// ---- YARDS: History ----
+function _auditBuildYardsHistory(report, dateFrom, dateTo, codeQ, descQ, txnType) {
+  var rows = [];
+  var inclRec = report==='received'||report==='complete'||(txnType==='received'||txnType==='all');
+  var inclWdh = report==='withdrawal'||report==='complete'||(txnType==='withdrawal'||txnType==='all');
+
+  if (inclRec) {
+    (STATE.threeMYards||[]).forEach(function(r){
+      if (codeQ && (r.itemId||'').toLowerCase().indexOf(codeQ)===-1) return;
+      if (descQ && (r.itemDesc||'').toLowerCase().indexOf(descQ)===-1) return;
+      rows.push({ date:'—', txnType:'RECEIVED', code:r.coreNo||'', desc:r.itemDesc||r.itemId||'', size:r.width||'', qty:parseFloat(r.qtyYards)||0, ref:r.itemId||'—', supplier:'3M', customer:'—', remarks:'Yard roll received' });
+    });
+  }
+  if (inclWdh) {
+    (STATE.yardsWithdrawals||STATE.yardswithdrawn||[]).forEach(function(w){
+      var d = _auditIsoDate(w.date||'');
+      if (dateFrom && d < dateFrom) return;
+      if (dateTo   && d > dateTo)   return;
+      if (codeQ && (w.coreNo||w.itemId||'').toLowerCase().indexOf(codeQ)===-1) return;
+      rows.push({ date:d||'—', txnType:'WITHDRAWAL', code:w.coreNo||'', desc:w.ref||'', size:'', qty:parseFloat(w.yards)||0, ref:w.ref||'—', supplier:'—', customer:'—', remarks:w.note||'—' });
+    });
+  }
+  rows.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  return rows;
+}
+
+// ---- PARTIAL ROLLS: Balance ----
+function _auditBuildPartialBalance(codeQ, descQ) {
+  var prs = STATE.partialRolls || [];
+  var rows = [];
+  prs.forEach(function(p) {
+    if (codeQ && (p.code||'').toLowerCase().indexOf(codeQ)===-1) return;
+    var it = (STATE.items||[]).find(function(i){ return i.code===p.code; })||{};
+    if (descQ && (it.desc||p.size||'').toLowerCase().indexOf(descQ)===-1) return;
+    rows.push({ date:p.date||'—', txnType:'BALANCE', code:p.code||'', desc:it.desc||'', size:p.size||((p.width||'')+(p.widthUnit||'')+'×'+(p.length||'')+(p.lengthUnit||'')), qty:parseFloat(p.qty)||0, ref:p.ref||'—', supplier:'—', customer:'—', remarks:p.withdrawalId||'—' });
+  });
+  rows.sort(function(a,b){ return a.code.localeCompare(b.code); });
+  return rows;
+}
+
+// ---- PARTIAL ROLLS: History ----
+function _auditBuildPartialHistory(report, dateFrom, dateTo, codeQ, descQ, txnType) {
+  var rows = [];
+  var inclRec = report==='received'||report==='complete'||(txnType==='received'||txnType==='all');
+  var inclWdh = report==='withdrawal'||report==='complete'||(txnType==='withdrawal'||txnType==='all');
+
+  if (inclRec) {
+    (STATE.partialRolls||[]).forEach(function(p){
+      var d = _auditIsoDate(p.date||'');
+      if (dateFrom && d < dateFrom) return;
+      if (dateTo   && d > dateTo)   return;
+      if (codeQ && (p.code||'').toLowerCase().indexOf(codeQ)===-1) return;
+      var it = (STATE.items||[]).find(function(i){ return i.code===p.code; })||{};
+      if (descQ && (it.desc||'').toLowerCase().indexOf(descQ)===-1) return;
+      var sizeStr = p.size||((p.width||'')+(p.widthUnit||'')+'×'+(p.length||'')+(p.lengthUnit||''));
+      rows.push({ date:d||'—', txnType:'RECEIVED (PR)', code:p.code||'', desc:it.desc||'', size:sizeStr, qty:parseFloat(p.qty)||0, ref:p.ref||'—', supplier:'—', customer:'—', remarks:p.withdrawalId||'—' });
+    });
+  }
+  if (inclWdh) {
+    (STATE.partialWithdrawals||[]).forEach(function(w){
+      var d = _auditIsoDate(w.date||'');
+      if (dateFrom && d < dateFrom) return;
+      if (dateTo   && d > dateTo)   return;
+      if (codeQ && (w.code||'').toLowerCase().indexOf(codeQ)===-1) return;
+      var it = (STATE.items||[]).find(function(i){ return i.code===w.code; })||{};
+      if (descQ && (it.desc||'').toLowerCase().indexOf(descQ)===-1) return;
+      var sizeStr = w.size||((w.width||'')+(w.widthUnit||'')+'×'+(w.length||'')+(w.lengthUnit||''));
+      rows.push({ date:d||'—', txnType:'WITHDRAWAL (PR)', code:w.code||'', desc:it.desc||'', size:sizeStr, qty:parseFloat(w.qty)||0, ref:w.ref||'—', supplier:'—', customer:'—', remarks:w.note||'—' });
+    });
+  }
+  rows.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  return rows;
+}
+
+// ---- Render results ----
+function _auditRender(rows, title, report, ledger) {
+  var area = document.getElementById('auditResultArea');
+  if (!area) return;
+
+  if (!rows.length) {
+    area.innerHTML = '<div class="audit-result-wrap"><div class="audit-empty"><div style="font-size:36px;margin-bottom:10px;opacity:0.4">📭</div><div style="font-size:14px;font-weight:600;color:#607D8B">No records match your filters</div><div style="font-size:12px;color:#90A4AE;margin-top:4px">Try broadening the date range or clearing the item filters</div></div></div>';
+    return;
+  }
+
+  var now = new Date();
+  var stamp = now.toLocaleString('en-PH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  // Summaries
+  var totalQty = 0, totalRec = 0, totalWdh = 0, totalBal = 0, uniqueCodes = {};
+  rows.forEach(function(r){
+    uniqueCodes[r.code] = 1;
+    totalQty += parseFloat(r.qty)||0;
+    totalRec += parseFloat(r.received)||0;
+    totalWdh += parseFloat(r.withdrawn)||0;
+    totalBal += parseFloat(r.balance)||0;
+  });
+  var uniqueCount = Object.keys(uniqueCodes).length;
+
+  var isBalance = (report === 'balance');
+  var summaryHtml = '<div class="audit-summary-bar">'
+    + '<div class="audit-stat"><div class="audit-stat-lbl">Total Rows</div><div class="audit-stat-val">'+rows.length+'</div><div class="audit-stat-sub">records</div></div>'
+    + '<div class="audit-stat"><div class="audit-stat-lbl">Unique Codes</div><div class="audit-stat-val">'+uniqueCount+'</div><div class="audit-stat-sub">item codes</div></div>';
+
+  if (isBalance) {
+    summaryHtml += '<div class="audit-stat"><div class="audit-stat-lbl">Total Received</div><div class="audit-stat-val" style="color:#2E7D32">'+totalRec+'</div><div class="audit-stat-sub">units</div></div>'
+      + '<div class="audit-stat"><div class="audit-stat-lbl">Total Withdrawn</div><div class="audit-stat-val" style="color:#C62828">'+totalWdh+'</div><div class="audit-stat-sub">units</div></div>'
+      + '<div class="audit-stat"><div class="audit-stat-lbl">Net Balance</div><div class="audit-stat-val" style="color:'+(totalBal>=0?'#1565C0':'#C62828')+'">'+totalBal+'</div><div class="audit-stat-sub">units on hand</div></div>';
+  } else {
+    summaryHtml += '<div class="audit-stat"><div class="audit-stat-lbl">Total Qty</div><div class="audit-stat-val">'+totalQty+'</div><div class="audit-stat-sub">units</div></div>';
+  }
+  summaryHtml += '</div>';
+
+  // Table header
+  var thHtml = '';
+  if (isBalance && ledger === 'main') {
+    thHtml = '<tr><th>#</th><th>Item Code</th><th>Description</th><th>Size</th><th>Opening</th><th>Beginning</th><th>Received</th><th>Withdrawn</th><th>Balance</th></tr>';
+  } else if (isBalance) {
+    thHtml = '<tr><th>#</th><th>Core / Code</th><th>Description</th><th>Size / Width</th><th>Received</th><th>Withdrawn</th><th>Remaining</th></tr>';
+  } else {
+    thHtml = '<tr><th>#</th><th>Date</th><th>Type</th><th>Item Code</th><th>Description</th><th>Size</th><th>Qty</th><th>Ref / MRR / WD#</th><th>Supplier / Customer</th><th>Remarks</th></tr>';
+  }
+
+  // Table rows
+  var bodyHtml = '';
+  rows.forEach(function(r, i) {
+    var rowN = i + 1;
+    if (isBalance && ledger === 'main') {
+      var balColor = (r.balance||0) <= 0 ? '#C62828' : ((r.balance||0) < 5 ? '#E65100' : '#1565C0');
+      bodyHtml += '<tr>'
+        + '<td style="color:#90A4AE;font-size:11px">'+rowN+'</td>'
+        + '<td class="td-code">'+escapeHtml(r.code)+'</td>'
+        + '<td>'+escapeHtml(r.desc)+'</td>'
+        + '<td><span class="pill pill-gray">'+escapeHtml(r.size||'—')+'</span></td>'
+        + '<td style="text-align:right">'+escapeHtml(String(r.opening||0))+'</td>'
+        + '<td style="text-align:right">'+escapeHtml(String(r.beginning||0))+'</td>'
+        + '<td style="text-align:right"><span class="audit-pill-received">'+escapeHtml(String(r.received||0))+'</span></td>'
+        + '<td style="text-align:right"><span class="audit-pill-withdrawn">'+escapeHtml(String(r.withdrawn||0))+'</span></td>'
+        + '<td style="text-align:right;font-weight:700;color:'+balColor+'">'+escapeHtml(String(r.balance||0))+'</td>'
+        + '</tr>';
+    } else if (isBalance) {
+      var remColor = (r.balance||0) <= 0 ? '#C62828' : '#1565C0';
+      bodyHtml += '<tr>'
+        + '<td style="color:#90A4AE;font-size:11px">'+rowN+'</td>'
+        + '<td class="td-code">'+escapeHtml(r.code)+'</td>'
+        + '<td>'+escapeHtml(r.desc)+'</td>'
+        + '<td>'+escapeHtml(r.size||'—')+'</td>'
+        + '<td style="text-align:right"><span class="audit-pill-received">'+escapeHtml(String(r.received||0))+'</span></td>'
+        + '<td style="text-align:right"><span class="audit-pill-withdrawn">'+escapeHtml(String(r.withdrawn||0))+'</span></td>'
+        + '<td style="text-align:right;font-weight:700;color:'+remColor+'">'+escapeHtml(String(r.balance||0))+'</td>'
+        + '</tr>';
+    } else {
+      var txnPill = r.txnType && r.txnType.indexOf('RECEIVED') === 0
+        ? '<span class="audit-pill-received">↘ '+escapeHtml(r.txnType)+'</span>'
+        : (r.txnType === 'BEGINNING'
+            ? '<span class="pill pill-blue">★ '+escapeHtml(r.txnType)+'</span>'
+            : '<span class="audit-pill-withdrawn">↗ '+escapeHtml(r.txnType)+'</span>');
+      var suppCust = (r.supplier && r.supplier !== '—') ? r.supplier : (r.customer && r.customer !== '—' ? r.customer : '—');
+      bodyHtml += '<tr>'
+        + '<td style="color:#90A4AE;font-size:11px">'+rowN+'</td>'
+        + '<td style="white-space:nowrap;font-size:12px">'+escapeHtml(r.date)+'</td>'
+        + '<td>'+txnPill+'</td>'
+        + '<td class="td-code">'+escapeHtml(r.code)+'</td>'
+        + '<td>'+escapeHtml(r.desc)+'</td>'
+        + '<td><span class="pill pill-gray">'+escapeHtml(r.size||'—')+'</span></td>'
+        + '<td style="text-align:right;font-weight:700">'+escapeHtml(String(r.qty||0))+'</td>'
+        + '<td style="font-size:12px;font-family:monospace">'+escapeHtml(r.ref||'—')+'</td>'
+        + '<td style="font-size:12px">'+escapeHtml(suppCust)+'</td>'
+        + '<td style="font-size:12px;color:#607D8B;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.remarks||'')+'">'+escapeHtml(r.remarks||'—')+'</td>'
+        + '</tr>';
+    }
+  });
+
+  area.innerHTML = '<div class="audit-result-wrap">'
+    + '<div class="audit-result-header">'
+    + '<div class="audit-result-title">📊 '+escapeHtml(title)+'</div>'
+    + '<div class="audit-result-meta">'+rows.length+' row'+(rows.length===1?'':'s')+' · Generated '+stamp+'</div>'
+    + '</div>'
+    + summaryHtml
+    + '<div class="audit-table-wrap"><table><thead>'+thHtml+'</thead><tbody>'+bodyHtml+'</tbody></table></div>'
+    + '</div>';
+}
+
+// ---- Export to CSV/Excel ----
+function auditExportExcel() {
+  var rows = _auditState.lastRows || [];
+  var title = _auditState.lastTitle || 'Audit-Report';
+  if (!rows.length) { showToast('Generate a report first', 'error'); return; }
+
+  var report = _auditState.report;
+  var ledger = _auditState.ledger;
+  var isBalance = (report === 'balance');
+  var isMainBalance = isBalance && ledger === 'main';
+
+  var headers, dataFn;
+  if (isMainBalance) {
+    headers = ['Item Code','Description','Size','Opening Qty','Beginning','Received','Withdrawn','Balance'];
+    dataFn = function(r){ return [r.code, r.desc, r.size, r.opening||0, r.beginning||0, r.received||0, r.withdrawn||0, r.balance||0]; };
+  } else if (isBalance) {
+    headers = ['Core / Code','Description','Size / Width','Received','Withdrawn','Remaining'];
+    dataFn = function(r){ return [r.code, r.desc, r.size, r.received||0, r.withdrawn||0, r.balance||0]; };
+  } else {
+    headers = ['Date','Transaction Type','Item Code','Description','Size','Qty','Ref / MRR / WD#','Supplier / Customer','Remarks'];
+    dataFn = function(r){ return [r.date, r.txnType, r.code, r.desc, r.size, r.qty||0, r.ref||'', (r.supplier&&r.supplier!=='—'?r.supplier:(r.customer||'')), r.remarks||'']; };
+  }
+
+  function csvCell(v) {
+    v = String(v == null ? '' : v);
+    if (v.indexOf(',') !== -1 || v.indexOf('"') !== -1 || v.indexOf('\n') !== -1) {
+      return '"' + v.replace(/"/g, '""') + '"';
+    }
+    return v;
+  }
+
+  var lines = [headers.map(csvCell).join(',')];
+  rows.forEach(function(r){ lines.push(dataFn(r).map(csvCell).join(',')); });
+
+  var BOM = '\ufeff';
+  var blob = new Blob([BOM + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  var d = new Date();
+  var stamp = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var filename = 'JHONG-'+title.replace(/[^a-zA-Z0-9]+/g,'-')+'-'+stamp+'.csv';
+
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ try{ document.body.removeChild(a); URL.revokeObjectURL(url); }catch(e){} }, 100);
+  showToast('📥 Exported '+rows.length+' rows to '+filename, 'success');
+}
+
+// ---- Email modal ----
+function auditOpenEmailModal() {
+  var rows = _auditState.lastRows || [];
+  if (!rows.length) { showToast('Generate a report first', 'error'); return; }
+  var d = new Date();
+  var stamp = d.toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'});
+  var subj = document.getElementById('auditEmailSubject');
+  if (subj && !subj.value) subj.value = 'JHONG Inventory Report — '+(_auditState.lastTitle||'Audit')+ ' ('+stamp+')';
+  var modal = document.getElementById('auditEmailModal');
+  if (modal) modal.classList.add('show');
+}
+
+function auditCloseEmailModal() {
+  var modal = document.getElementById('auditEmailModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function auditSendEmail() {
+  var to   = (document.getElementById('auditEmailTo')||{}).value || '';
+  var subj = (document.getElementById('auditEmailSubject')||{}).value || 'JHONG Inventory Report';
+  var body = (document.getElementById('auditEmailBody')||{}).value || '';
+  var rows = _auditState.lastRows || [];
+
+  // Build a plain-text summary for the email body
+  var report = _auditState.report;
+  var ledger = _auditState.ledger;
+  var isBalance = report === 'balance';
+  var lines = ['Report: ' + (_auditState.lastTitle||''), 'Generated: '+ ((_auditState.lastGenerated||new Date()).toLocaleString('en-PH')), 'Rows: '+rows.length, ''];
+
+  var maxRows = Math.min(rows.length, 50);
+  if (isBalance && ledger === 'main') {
+    lines.push('Item Code | Description | Size | Balance');
+    lines.push('----------|-------------|------|--------');
+    rows.slice(0, maxRows).forEach(function(r){ lines.push([r.code,r.desc,r.size||'',r.balance||0].join(' | ')); });
+  } else if (isBalance) {
+    lines.push('Code | Description | Remaining');
+    lines.push('-----|-------------|----------');
+    rows.slice(0, maxRows).forEach(function(r){ lines.push([r.code,r.desc,r.balance||0].join(' | ')); });
+  } else {
+    lines.push('Date | Type | Code | Qty | Ref');
+    lines.push('-----|------|------|-----|----');
+    rows.slice(0, maxRows).forEach(function(r){ lines.push([r.date, r.txnType, r.code, r.qty||0, r.ref||''].join(' | ')); });
+  }
+  if (rows.length > maxRows) lines.push('... and '+(rows.length - maxRows)+' more rows (see exported CSV).');
+
+  var fullBody = (body ? body + '\n\n' : '') + lines.join('\n');
+  var mailto = 'mailto:' + encodeURIComponent(to)
+    + '?subject=' + encodeURIComponent(subj)
+    + '&body=' + encodeURIComponent(fullBody);
+
+  window.location.href = mailto;
+  auditCloseEmailModal();
+  showToast('✉ Opening email client...', 'success');
+}
+
+// ---- Utility ----
+function _auditIsoDate(raw) {
+  if (!raw || raw === '—') return '';
+  raw = String(raw).trim();
+  // Already ISO yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
+  // Try parse
+  try {
+    var d = new Date(raw);
+    if (!isNaN(d)) {
+      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+  } catch(e){}
+  return raw;
+}
 
 // =====================================================================
 //  DESIGN MODE  —  toggle to label every UI region with a clickable
