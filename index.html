@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_6.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_7.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -594,7 +594,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">7/8</span>
+  <span class="sync-progress" id="syncIndicatorProgress">6/8</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1854,16 +1854,15 @@ function syncNow(opts) {
     fetchFromAppsScript('read_yardsreceived',
       function(rows){
         var parsed = parseYardsReceivedRows(rows || []);
-        if (parsed && parsed.length) {
-          // Merge: preserve withdrawn totals from existing local rolls
-          var existing = STATE.threeMYards || [];
-          STATE.threeMYards = parsed.map(function(r){
-            var loc = existing.find(function(e){ return (e.coreNo||'').toLowerCase() === (r.coreNo||'').toLowerCase(); });
-            r.withdrawn = loc ? (parseFloat(loc.withdrawn)||0) : 0;
-            return r;
-          });
-          try { render3MYards(); } catch(e){}
-        }
+        // Always replace from backend — even an empty result is authoritative.
+        // Merge: preserve withdrawn totals from existing local rolls.
+        var existing = STATE.threeMYards || [];
+        STATE.threeMYards = parsed.map(function(r){
+          var loc = existing.find(function(e){ return (e.coreNo||'').toLowerCase() === (r.coreNo||'').toLowerCase(); });
+          r.withdrawn = loc ? (parseFloat(loc.withdrawn)||0) : 0;
+          return r;
+        });
+        try { render3MYards(); } catch(e){}
         bumpProg();
         resolve();
       },
@@ -5109,7 +5108,8 @@ function _readWithdrawalsWithBackfill(done, failed) {
               function(rows2){
                 var parsed2 = parseWithdrawalRows(rows2);
                 if (parsed2) {
-                  STATE.withdrawals = parsed2;
+                  var localW2 = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
+                  STATE.withdrawals = parsed2.concat(localW2);
                   try { renderHistory(); renderStocks(); } catch(e){}
                 }
                 if (res && res.filled) showToast('WITHDRAWAL ready — '+res.filled+' IDs backfilled. Delete now syncs to gsheet.', 'success');
@@ -5121,7 +5121,8 @@ function _readWithdrawalsWithBackfill(done, failed) {
           function(err){
             console.warn('backfill_withdrawal_ids failed:', err);
             if (parsed) {
-              STATE.withdrawals = parsed;
+              var localWe = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
+              STATE.withdrawals = parsed.concat(localWe);
               try { renderHistory(); renderStocks(); } catch(e){}
             }
             showToast('Could not backfill WITHDRAWAL IDs — redeploy the latest Apps Script.', 'error');
@@ -5130,7 +5131,8 @@ function _readWithdrawalsWithBackfill(done, failed) {
         return;
       }
       if (parsed) {
-        STATE.withdrawals = parsed;
+        var localW = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
+        STATE.withdrawals = parsed.concat(localW);
         try { renderHistory(); renderStocks(); } catch(e){}
       }
       done();
