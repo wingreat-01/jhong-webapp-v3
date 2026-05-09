@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_10.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_11.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -3605,6 +3605,11 @@ function delete3MYardsRoll(coreNo) {
   STATE.threeMYards = (STATE.threeMYards || []).filter(function(x){ return (x.coreNo||'') !== coreNo; });
   saveState();
   render3MYards();
+  // Delete from YARDSRECEIVED sheet in backend
+  postToScript({action:'delete_yardsreceived', id: r._backendId || '', mrrNo: r.coreNo},
+    function(){ /* deleted from sheet */ },
+    function(err){ showToast('Deleted locally — YARDSRECEIVED sheet delete failed: '+err, 'error'); }
+  );
 }
 
 function clear3MYardsForm() {
