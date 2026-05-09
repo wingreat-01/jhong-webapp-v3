@@ -26,6 +26,8 @@ header{background:linear-gradient(135deg,#1B5E20 0%,#2E7D32 60%,#43A047 100%);co
 
 nav{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;display:flex;gap:4px;overflow-x:auto;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 .nav-tab{padding:12px 18px;font-size:13px;font-weight:600;color:#607D8B;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;transition:all 0.2s;background:none;border-top:none;border-left:none;border-right:none;display:flex;align-items:center;gap:7px}
+#beginningNavTab{display:none!important}
+#beginningNavTab.admin-visible{display:flex!important}
 .nav-tab:hover{color:#2E7D32;background:#F1F8E9}
 .nav-tab.active{color:#2E7D32;border-bottom-color:#2E7D32;background:#E8F5E9}
 .tab-icon{font-size:15px}
@@ -7178,7 +7180,11 @@ function updateRoleBadge() {
   // Show Beginning tab only in ADMIN mode; redirect away if currently on it
   var beginningNavTab = document.getElementById('beginningNavTab');
   if (beginningNavTab) {
-    beginningNavTab.style.display = STATE._isAdmin ? '' : 'none';
+    if (STATE._isAdmin) {
+      beginningNavTab.classList.add('admin-visible');
+    } else {
+      beginningNavTab.classList.remove('admin-visible');
+    }
   }
   if (!STATE._isAdmin && STATE.activeTab === 'beginning') {
     switchTab('stocks');
