@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_9.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_10.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -1110,22 +1110,22 @@ header{display:none!important}
     <div class="form-card">
       <div style="font-size:13px;font-weight:600;color:#607D8B;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px">Withdraw Yards</div>
       <div class="form-grid">
-        <div class="form-group ac-wrap">
+        <div class="form-group ac-wrap" style="grid-column:span 2">
           <label class="form-label">Core No. *</label>
           <input class="form-input" type="text" id="tmyWdCoreNo" placeholder="Type to search Core No..." autocomplete="off" oninput="onTmyWdCoreInput()" onkeydown="onTmyWdCoreKey(event)" onblur="setTimeout(hideTmyWdCoreAC,180)">
           <div class="ac-list" id="tmyWdCoreAcList"></div>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="grid-column:span 2">
           <label class="form-label">Item ID</label>
           <input class="form-input" type="text" id="tmyWdItemId" readonly="" placeholder="Auto-filled from Core No.">
         </div>
         <div class="form-group">
           <label class="form-label">Available (Yards)</label>
-          <input class="form-input" type="text" id="tmyWdAvail" readonly="" placeholder="Auto-filled">
+          <input class="form-input" type="text" id="tmyWdAvail" readonly="" placeholder="Auto-filled" style="max-width:50%">
         </div>
         <div class="form-group">
           <label class="form-label">Yards Withdrawn *</label>
-          <input class="form-input" type="number" id="tmyWdYards" placeholder="0" min="0" step="any">
+          <input class="form-input" type="number" id="tmyWdYards" placeholder="0" min="0" step="any" style="max-width:50%">
         </div>
         <div class="form-group">
           <label class="form-label">Date</label>
