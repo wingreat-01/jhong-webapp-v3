@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_7.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_8.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -2865,7 +2865,15 @@ function deleteWithdrawal(id) {
   renderStocks();
 
   if (r._legacyNoId) {
-    showToast('Deleted locally only — this row has no backend ID. Remove it manually from the WITHDRAWAL sheet (row '+(r._sheetRow||'?')+').', 'error');
+    if (r._sheetRow) {
+      // Legacy row: no ID in column I, but we know its sheet row number.
+      // Send sheetRow so the backend can delete it directly.
+      postToScript({action:'delete_withdrawal', sheetRow: r._sheetRow},
+        function(){ /* deleted */ },
+        function(err){ showToast('Deleted locally — backend delete failed: '+err+'. Remove row '+(r._sheetRow||'?')+' manually from the WITHDRAWAL sheet.', 'error'); });
+    } else {
+      showToast('Deleted locally only — this row has no backend ID and no row number. Remove it manually from the WITHDRAWAL sheet.', 'error');
+    }
     return;
   }
 
