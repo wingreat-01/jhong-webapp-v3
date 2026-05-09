@@ -611,7 +611,7 @@ header{display:none!important}
 
   <nav id="mainNav">
     <button class="nav-tab active" onclick="switchTab('stocks')"><span class="tab-icon">■</span>Stocks</button>
-    <button class="nav-tab" onclick="switchTab('beginning')"><span class="tab-icon">★</span>Beginning</button>
+    <button class="nav-tab" id="beginningNavTab" onclick="switchTab('beginning')" style="display:none"><span class="tab-icon">★</span>Beginning</button>
     <button class="nav-tab" onclick="switchTab('withdraw')"><span class="tab-icon">↗</span>Withdraw</button>
     <button class="nav-tab" onclick="switchTab('salesorder')"><span class="tab-icon">🛒</span>Sales Order</button>
     <button class="nav-tab" onclick="switchTab('served')"><span class="tab-icon">✓</span>Served</button>
@@ -2858,20 +2858,13 @@ function deleteWithdrawal(id) {
   renderStocks();
 
   if (r._legacyNoId) {
-    // Row has no backend ID — attempt delete by sheet row position if known
-    if (r._sheetRow) {
-      postToScript({action:'delete_withdrawal_by_row', sheetRow: r._sheetRow},
-        function(){ showToast('✓ Withdrawal deleted from JHONG BACKEND.', 'success'); },
-        function(err){ showToast('Deleted locally — backend delete failed: '+err+'. Remove row '+(r._sheetRow||'?')+' manually from the WITHDRAWAL sheet.', 'error'); });
-    } else {
-      showToast('Deleted locally only — this row has no backend ID. Remove it manually from the WITHDRAWAL sheet.', 'error');
-    }
+    showToast('Deleted locally only — this row has no backend ID. Remove it manually from the WITHDRAWAL sheet (row '+(r._sheetRow||'?')+').', 'error');
     return;
   }
 
   if (r.source === 'backend' || r.source === 'pending') {
     postToScript({action:'delete_withdrawal', id: id},
-      function(){ showToast('✓ Withdrawal deleted from JHONG BACKEND.', 'success'); },
+      function(){ /* success toast suppressed per user request */ },
       function(err){ showToast('Deleted locally — backend delete failed: '+err, 'error'); });
   } else {
     showToast('Deleted (local only)', 'success');
@@ -7181,6 +7174,14 @@ function updateRoleBadge() {
       btn.style.borderColor = 'rgba(239,68,68,0.3)';
       btn.title = 'Switch to ADMIN mode (required for deletes). Stays unlocked until you close this tab.';
     }
+  }
+  // Show Beginning tab only in ADMIN mode; redirect away if currently on it
+  var beginningNavTab = document.getElementById('beginningNavTab');
+  if (beginningNavTab) {
+    beginningNavTab.style.display = STATE._isAdmin ? '' : 'none';
+  }
+  if (!STATE._isAdmin && STATE.activeTab === 'beginning') {
+    switchTab('stocks');
   }
   // Re-render any tables whose Del/edit buttons depend on _isAdmin so
   // they switch state immediately when admin mode is toggled.
