@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_2.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_3.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -27,8 +27,6 @@ header{background:linear-gradient(135deg,#1B5E20 0%,#2E7D32 60%,#43A047 100%);co
 
 nav{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;display:flex;gap:4px;overflow-x:auto;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 .nav-tab{padding:12px 18px;font-size:13px;font-weight:600;color:#607D8B;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;transition:all 0.2s;background:none;border-top:none;border-left:none;border-right:none;display:flex;align-items:center;gap:7px}
-#beginningNavTab{display:none!important}
-#beginningNavTab.admin-visible{display:flex!important}
 .nav-tab:hover{color:#2E7D32;background:#F1F8E9}
 .nav-tab.active{color:#2E7D32;border-bottom-color:#2E7D32;background:#E8F5E9}
 .tab-icon{font-size:15px}
@@ -595,11 +593,11 @@ header{display:none!important}
 
 <div class="sync-indicator" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
-  <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
+  <span class="sync-txt" id="syncIndicatorText">Sync complete — 10.8s — 276 items, 2 withdrawals, 4 received, 30 beginning, 0 orders</span>
   <span class="sync-progress" id="syncIndicatorProgress"></span>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast">Repairing WITHDRAWAL IDs in JHONG BACKEND…</div>
 
 <div class="app-shell">
 
@@ -613,19 +611,19 @@ header{display:none!important}
   </div>
 
   <nav id="mainNav">
-    <button class="nav-tab active" onclick="switchTab(&#39;stocks&#39;)"><span class="tab-icon">■</span>Stocks</button>
-    <button class="nav-tab" id="beginningNavTab" onclick="switchTab(&#39;beginning&#39;)" style="display:none"><span class="tab-icon">★</span>Beginning</button>
+    <button class="nav-tab" onclick="switchTab(&#39;stocks&#39;)"><span class="tab-icon">■</span>Stocks</button>
+    <button class="nav-tab" onclick="switchTab(&#39;beginning&#39;)"><span class="tab-icon">★</span>Beginning</button>
     <button class="nav-tab" onclick="switchTab(&#39;withdraw&#39;)"><span class="tab-icon">↗</span>Withdraw</button>
     <button class="nav-tab" onclick="switchTab(&#39;salesorder&#39;)"><span class="tab-icon">🛒</span>Sales Order</button>
     <button class="nav-tab" onclick="switchTab(&#39;served&#39;)"><span class="tab-icon">✓</span>Served</button>
     <button class="nav-tab" onclick="switchTab(&#39;received&#39;)"><span class="tab-icon">↘</span>Received</button>
-    <button class="nav-tab" onclick="switchTab(&#39;threemyards&#39;)"><span class="tab-icon">▥</span>3M Yards</button>
+    <button class="nav-tab active" onclick="switchTab(&#39;threemyards&#39;)"><span class="tab-icon">▥</span>3M Yards</button>
     <button class="nav-tab" onclick="switchTab(&#39;partialrolls&#39;)"><span class="tab-icon">⊞</span>Partial Rolls</button>
     <button class="nav-tab" onclick="switchTab(&#39;search&#39;)"><span class="tab-icon">⚲</span>Search</button>
   </nav>
 
   <div class="sidebar-footer">
-    <button class="sidebar-footer-btn" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">↻ Sync Now</button>
+    <button class="sidebar-footer-btn" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">Sync Now</button>
     <button class="sidebar-footer-btn" id="settingsBtn" onclick="openSettingsWithPin()" title="Show setup / config panel — protected by 4-digit PIN">⚙ Settings 🔒</button>
     <button class="sidebar-footer-btn" id="designModeBtn" onclick="openDesignModeWithPin()" title="Design Mode — click to label every UI region with a codename">🛠 Design 🔒</button>
     <div class="sidebar-user">
@@ -689,7 +687,7 @@ header{display:none!important}
 </div>
 
 <!-- ============ STOCKS TAB ============ -->
-<div class="tab-panel active" id="tab-stocks">
+<div class="tab-panel" id="tab-stocks">
   <div class="form-card" style="padding:14px 18px;margin-bottom:12px">
     <div style="font-size:12px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">🔍 Filter Stocks</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -802,12 +800,8 @@ header{display:none!important}
   <div class="card">
     <div class="table-wrap">
       <table id="soGsTable">
-        <thead id="soGsHead">
-          <tr><th>Date</th><th>Job Order</th><th>Item ID</th><th>Width</th><th>Length</th><th>Qty</th><th>Unit</th><th>Customer</th><th>Urgency</th><th>Status</th><th>Sales</th><th>Action</th></tr>
-        </thead>
-        <tbody id="soGsBody">
-          <tr><td colspan="12"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Set the SALESORDER CSV URL in ⚙ Settings, then click ⏬ Load / Refresh.</div></div></td></tr>
-        </tbody>
+        <thead id="soGsHead"><tr><th>Date</th><th>Job Order</th><th style="background:#FFE0B2;color:#BF360C">Item ID ★</th><th>Item Description</th><th>W</th><th>L</th><th>Qty</th><th>Unit</th><th>Customer</th><th>Status</th><th>Sales</th><th>Action</th></tr></thead>
+        <tbody id="soGsBody"><tr><td colspan="12"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No matching rows yet — click ⏬ Load / Refresh. (Set the SALESORDER CSV URL in ⚙ Settings if you haven't.)</div></div></td></tr></tbody>
       </table>
     </div>
     <div class="pagination" id="soGsPagination" style="display:none;padding:10px 14px;border-top:1px solid var(--border);display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -824,7 +818,7 @@ header{display:none!important}
 <div class="tab-panel" id="tab-served">
   <div class="section-header">
     <div class="section-title">✓ Served Orders</div>
-    <span class="badge" id="servedBadge" style="background:#C8E6C9;color:#1B5E20">0 records</span>
+    <span class="badge" id="servedBadge" style="background:#C8E6C9;color:#1B5E20">7 records</span>
   </div>
 
   <div data-region="SERVED.toolbar" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
@@ -842,9 +836,7 @@ header{display:none!important}
         <thead id="servedHead">
           <tr><th>Date</th><th>Job Order</th><th>Item ID</th><th>Width</th><th>Length</th><th>Qty</th><th>Unit</th><th>Customer</th><th>Urgency</th><th>Status</th><th>Sales</th><th>Served At</th><th>Action</th></tr>
         </thead>
-        <tbody id="servedBody">
-          <tr><td colspan="13"><div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No served orders yet — mark rows as Served in the Sales Order tab.</div></div></td></tr>
-        </tbody>
+        <tbody id="servedBody"><tr><td style="white-space:nowrap">May 8, 2026</td><td>CO-26-0780</td><td style="background:#FFF8E1;color:#BF360C;font-weight:700;font-family:monospace">STRETCH FILM 15MIC</td><td style="text-align:right">20</td><td style="text-align:right">500</td><td style="text-align:right;font-weight:700">12</td><td>ROLL</td><td>YUNITRADE</td><td></td><td>Waiting</td><td>KATHY</td><td style="white-space:nowrap;color:#2E7D32;font-weight:600">May 8, 2:36 PM</td><td style="text-align:center"><button type="button" class="btn-secondary" style="padding:5px 12px;font-size:11px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2" onclick="clearServedRow(&#39;co-26-0780||stretch film 15mic&#39;)" title="Clear this served item from the webapp (local only — gsheet not touched)">Clear</button></td></tr><tr><td style="white-space:nowrap">May 5, 2026</td><td>CO-26-0709</td><td style="background:#FFF8E1;color:#BF360C;font-weight:700;font-family:monospace">3931-HIP-YEL</td><td style="text-align:right">24</td><td style="text-align:right">50</td><td style="text-align:right;font-weight:700">1</td><td>ROLL</td><td>SWITCH INDUSTRIAL</td><td></td><td>Delivery</td><td>JASMIN</td><td style="white-space:nowrap;color:#2E7D32;font-weight:600">May 5, 8:22 PM</td><td style="text-align:center"><button type="button" class="btn-secondary" style="padding:5px 12px;font-size:11px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2" onclick="clearServedRow(&#39;co-26-0709||3931-hip-yel&#39;)" title="Clear this served item from the webapp (local only — gsheet not touched)">Clear</button></td></tr><tr><td style="white-space:nowrap">Apr 27, 2026</td><td>CO-26-0498</td><td style="background:#FFF8E1;color:#BF360C;font-weight:700;font-family:monospace">610-10-WHT</td><td style="text-align:right">48</td><td style="text-align:right">50</td><td style="text-align:right;font-weight:700">1</td><td>ROLL</td><td>ES PRINT MEDIA INC</td><td></td><td>Delivery</td><td>MEANN</td><td style="white-space:nowrap;color:#2E7D32;font-weight:600">Apr 27, 7:57 PM</td><td style="text-align:center"><button type="button" class="btn-secondary" style="padding:5px 12px;font-size:11px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2" onclick="clearServedRow(&#39;co-26-0498||610-10-wht&#39;)" title="Clear this served item from the webapp (local only — gsheet not touched)">Clear</button></td></tr><tr><td style="white-space:nowrap">Apr 27, 2026</td><td>CO-26-0506</td><td style="background:#FFF8E1;color:#BF360C;font-weight:700;font-family:monospace">TOYOBO</td><td style="text-align:right">420</td><td style="text-align:right">594</td><td style="text-align:right;font-weight:700">20</td><td>PCS</td><td>NATIONAL LABELLING</td><td></td><td>Delivery</td><td>MEANN</td><td style="white-space:nowrap;color:#2E7D32;font-weight:600">Apr 27, 12:57 PM</td><td style="text-align:center"><button type="button" class="btn-secondary" style="padding:5px 12px;font-size:11px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2" onclick="clearServedRow(&#39;co-26-0506||toyobo&#39;)" title="Clear this served item from the webapp (local only — gsheet not touched)">Clear</button></td></tr><tr><td style="white-space:nowrap">Apr 27, 2026</td><td>CO-26-0497</td><td style="background:#FFF8E1;color:#BF360C;font-weight:700;font-family:monospace">3931-HIP-YEL</td><td style="text-align:right">48</td><td style="text-align:right">50</td><td style="text-align:right;font-weight:700">1</td><td>ROLL</td><td>CAGE ENTERPRISES</td><td></td><td>Pick-Up</td><td>MEANN</td><td style="white-space:nowrap;color:#2E7D32;font-weight:600">Apr 27, 8:50 AM</td><td style="text-align:center"><button type="button" class="btn-secondary" style="padding:5px 12px;font-size:11px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2" onclick="clearServedRow(&#39;co-26-0497||3931-hip-yel&#39;)" title="Clear this served item from the webapp (local only — gsheet not touched)">Clear</button></td></tr><tr><td style="white-space:nowrap">Apr 22, 2026</td><td>CO-26-0407</td><td style="background:#FFF8E1;color:#BF360C;font-weight:700;font-family:monospace">SR-37</td><td style="text-align:right">1</td><td style="text-align:right">440</td><td style="text-align:right;font-weight:700">50</td><td>ROLL</td><td>WISP &amp; WARP</td><td></td><td>Delivery</td><td>MEANN</td><td style="white-space:nowrap;color:#2E7D32;font-weight:600">Apr 26, 7:55 PM</td><td style="text-align:center"><button type="button" class="btn-secondary" style="padding:5px 12px;font-size:11px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2" onclick="clearServedRow(&#39;co-26-0407||sr-37&#39;)" title="Clear this served item from the webapp (local only — gsheet not touched)">Clear</button></td></tr><tr><td style="white-space:nowrap">Apr 22, 2026</td><td>CO-26-0407</td><td style="background:#FFF8E1;color:#BF360C;font-weight:700;font-family:monospace">SR-28</td><td style="text-align:right">0.75</td><td style="text-align:right">440</td><td style="text-align:right;font-weight:700">20</td><td>ROLL</td><td>WISP &amp; WARP</td><td></td><td>Delivery</td><td>MEANN</td><td style="white-space:nowrap;color:#2E7D32;font-weight:600">Apr 26, 7:54 PM</td><td style="text-align:center"><button type="button" class="btn-secondary" style="padding:5px 12px;font-size:11px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2" onclick="clearServedRow(&#39;co-26-0407||sr-28&#39;)" title="Clear this served item from the webapp (local only — gsheet not touched)">Clear</button></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -920,7 +912,7 @@ header{display:none!important}
       <summary style="cursor:pointer;list-style:none;padding:10px 14px;background:#ECEFF1;border:1px solid #CFD8DC;border-radius:8px;font-weight:700;color:#37474F;display:flex;align-items:center;gap:10px;font-size:14px">
         <span style="font-size:16px">⏷</span>
         <span>Recent Withdrawals</span>
-        <span class="badge" id="withdrawalBadge" style="margin-left:8px;background:#CFD8DC;color:#263238">0 records</span>
+        <span class="badge" id="withdrawalBadge" style="margin-left:8px;background:#CFD8DC;color:#263238">Showing 1–2 of 2 records</span>
         <span style="margin-left:auto;font-size:11px;font-weight:500;color:#78909C">click to collapse / expand</span>
       </summary>
       <div style="padding-top:14px">
@@ -936,7 +928,7 @@ header{display:none!important}
           <div class="table-wrap">
             <table>
               <thead><tr><th>Date</th><th>Item Code</th><th>Description</th><th>Size</th><th>Qty</th><th>Withdrawal No.</th><th>Customer</th><th>Remarks</th><th style="width:90px">Action</th></tr></thead>
-              <tbody id="historyBody"><tr><td colspan="9"><div class="empty-state"><div class="empty-icon">⏷</div><div class="empty-text">No withdrawal records found.</div></div></td></tr></tbody>
+              <tbody id="historyBody"><tr><td style="white-space:nowrap">May 9, 2026</td><td class="td-code">610-10-WHT-B1</td><td>—</td><td><span class="pill pill-gray">48 x 50</span></td><td style="font-weight:700;color:#C62828">0</td><td><span class="pill pill-blue">whd_1778305106268_ifpmd</span></td><td>12</td><td>— <span class="pill pill-blue">Saved</span></td><td style="white-space:nowrap"><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7;margin-right:4px" onclick="transferToYards(this)" data-code="610-10-WHT-B1" data-desc="" data-size="48 x 50" title="Transfer to 3M Yards">▥ Yards</button><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFF8E1;color:#E65100;border-color:#FFE082;margin-right:4px" onclick="editWithdrawal(&#39;whd_legacy_r2_61010WHT&#39;)">✎ Edit</button><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#ECEFF1;color:#90A4AE;border-color:#CFD8DC;cursor:not-allowed" disabled="" title="Only ADMIN can delete withdrawals. Click 🔓 Admin in the header to unlock.">🔒 Del</button></td></tr><tr><td style="white-space:nowrap">May 9, 2026</td><td class="td-code">610-10-WHT-B1</td><td>—</td><td><span class="pill pill-gray">48 x 50</span></td><td style="font-weight:700;color:#C62828">0</td><td><span class="pill pill-blue">whd_1778305972004_11weo</span></td><td>ha</td><td>TO YARDS #101 <span class="pill pill-blue">Saved</span></td><td style="white-space:nowrap"><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7;margin-right:4px" onclick="transferToYards(this)" data-code="610-10-WHT-B1" data-desc="" data-size="48 x 50" title="Transfer to 3M Yards">▥ Yards</button><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFF8E1;color:#E65100;border-color:#FFE082;margin-right:4px" onclick="editWithdrawal(&#39;whd_legacy_r3_61010WHT&#39;)">✎ Edit</button><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#ECEFF1;color:#90A4AE;border-color:#CFD8DC;cursor:not-allowed" disabled="" title="Only ADMIN can delete withdrawals. Click 🔓 Admin in the header to unlock.">🔒 Del</button></td></tr></tbody>
             </table>
           </div>
           <div class="pagination" id="hPagination" style="display:none">
@@ -1030,10 +1022,10 @@ header{display:none!important}
 
 <!-- ============ SEARCH TAB ============ -->
 <!-- ============ 3M YARDS TAB ============ -->
-<div class="tab-panel" id="tab-threemyards">
+<div class="tab-panel active" id="tab-threemyards">
   <div class="section-header">
     <div class="section-title">▥ 3M Yards — Roll Ledger</div>
-    <span class="badge" id="threemYardsBadge">0 rolls</span>
+    <span class="badge" id="threemYardsBadge">1 roll</span>
   </div>
 
   <!-- Sub-tab nav: Add/Edit Roll | Withdraw Yards -->
@@ -1100,7 +1092,7 @@ header{display:none!important}
             <th style="width:110px">Actions</th>
           </tr>
         </thead>
-        <tbody id="threemYardsBody"><tr><td colspan="8"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">No rolls yet — add one above.</div></div></td></tr></tbody>
+        <tbody id="threemYardsBody"><tr><td class="td-code">101</td><td class="td-code" style="color:#BF360C;font-weight:700">610-10-WHT-B1</td><td>3M 610-10 White B1</td><td><span class="pill pill-gray">48 x 50</span></td><td style="text-align:right;font-weight:700">50</td><td style="text-align:right;color:#C62828;font-weight:600">0</td><td style="text-align:right;font-weight:700;color:#2E7D32">50</td><td style="white-space:nowrap"><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFF8E1;color:#E65100;border-color:#FFE082;margin-right:4px" onclick="edit3MYardsRoll(&#39;101&#39;)">✎ Edit</button><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#ECEFF1;color:#90A4AE;border-color:#CFD8DC;cursor:not-allowed" disabled="" title="Only ADMIN can delete rolls.">🔒 Del</button></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1342,7 +1334,7 @@ header{display:none!important}
 </div><!-- /app-shell -->
 
 <!-- ITEM PICKER (Search) — fixed overlay so it is never clipped -->
-<div class="item-picker" id="itemPicker">
+<div class="item-picker" id="itemPicker" style="display: none;">
   <div class="item-picker-header">
     <span id="pickerTitle">Select items to search</span>
     <div class="picker-actions">
@@ -2727,6 +2719,27 @@ function clearWithdrawForm() {
 }
 
 // ---------- Edit withdrawal (mirrors editReceived) ----------
+function transferToYards(btn) {
+  var code = btn.getAttribute('data-code') || '';
+  var desc = btn.getAttribute('data-desc') || '';
+  var size = btn.getAttribute('data-size') || '';
+  // Switch to 3M Yards tab, Add/Edit Roll sub-tab
+  switchTab('threemyards');
+  switchTmySubTab('add');
+  // Auto-fill fields after tab renders
+  setTimeout(function() {
+    var itemIdEl  = document.getElementById('tmyItemId');
+    var itemDescEl = document.getElementById('tmyItemDesc');
+    var widthEl   = document.getElementById('tmyWidth');
+    var coreEl    = document.getElementById('tmyCoreNo');
+    if (itemIdEl)   { itemIdEl.value  = code; itemIdEl.dispatchEvent(new Event('input')); }
+    if (itemDescEl) { itemDescEl.value = desc; }
+    if (widthEl && size)    { widthEl.value = size; }
+    if (coreEl)     coreEl.focus();
+    showToast('Item transferred — enter Core No. and Qty to add the roll.', 'success');
+  }, 120);
+}
+
 function editWithdrawal(id) {
   if (!id) return;
   var w = STATE.withdrawals.find(function(x){ return x.id === id; });
@@ -2866,6 +2879,7 @@ function renderHistory() {
          + '<td>'+escapeHtml(w.customer||'—')+'</td>'
          + '<td>'+escapeHtml(w.remarks||'—')+' '+sourceLabel+'</td>'
          + '<td style="white-space:nowrap">'
+         + '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7;margin-right:4px" onclick="transferToYards(this)" data-code="'+escAttr(w.itemCode)+'" data-desc="'+escAttr(w.desc)+'" data-size="'+escAttr(w.size)+'" title="Transfer to 3M Yards">▥ Yards</button>'
          + '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFF8E1;color:#E65100;border-color:#FFE082;margin-right:4px" onclick="editWithdrawal(\''+escAttr(w.id)+'\')">✎ Edit</button>'
          + (STATE._isAdmin
               ? '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFEBEE;color:#C62828;border-color:#FFCDD2" onclick="deleteWithdrawal(\''+escAttr(w.id)+'\')">🗑 Del</button>'
@@ -7113,18 +7127,6 @@ function updateRoleBadge() {
       btn.style.borderColor = 'rgba(239,68,68,0.3)';
       btn.title = 'Switch to ADMIN mode (required for deletes). Stays unlocked until you close this tab.';
     }
-  }
-  // Show Beginning tab only in ADMIN mode; redirect away if currently on it
-  var beginningNavTab = document.getElementById('beginningNavTab');
-  if (beginningNavTab) {
-    if (STATE._isAdmin) {
-      beginningNavTab.classList.add('admin-visible');
-    } else {
-      beginningNavTab.classList.remove('admin-visible');
-    }
-  }
-  if (!STATE._isAdmin && STATE.activeTab === 'beginning') {
-    switchTab('stocks');
   }
   // Re-render any tables whose Del/edit buttons depend on _isAdmin so
   // they switch state immediately when admin mode is toggled.
