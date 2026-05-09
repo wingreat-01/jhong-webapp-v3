@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_5.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_6.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -594,7 +594,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">6/8</span>
+  <span class="sync-progress" id="syncIndicatorProgress">7/8</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1795,8 +1795,10 @@ function syncNow(opts) {
       // We skip fetchCSV() because its appsScript-proxy attempt triggers CORS errors
       // from GitHub Pages (code.gs has no ?url= handler — it just serves the HTML).
       var bust = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
-      fetch(bust, { cache: 'no-cache', redirect: 'follow' })
-        .then(function(r){ if (!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+      var ctrl1 = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var t1 = setTimeout(function(){ if (ctrl1) ctrl1.abort(); }, 10000);
+      fetch(bust, { cache: 'no-cache', redirect: 'follow', signal: ctrl1 ? ctrl1.signal : undefined })
+        .then(function(r){ clearTimeout(t1); if (!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
         .then(function(text){
           console.log('[PR-sync] CSV fetched direct — bytes='+text.length);
           if (!text || text.trim().slice(0,5).toLowerCase().indexOf('<') === 0) {
@@ -1805,15 +1807,19 @@ function syncNow(opts) {
           applyPR(parsePartialRollsCSV(text), 'csv-direct');
         })
         .catch(function(err){
+          clearTimeout(t1);
           console.warn('[PR-sync] direct CSV fail, trying allorigins:', err);
           var alt = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-          fetch(alt, { cache: 'no-cache' })
-            .then(function(r){ if (!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+          var ctrl2 = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          var t2 = setTimeout(function(){ if (ctrl2) ctrl2.abort(); }, 10000);
+          fetch(alt, { cache: 'no-cache', signal: ctrl2 ? ctrl2.signal : undefined })
+            .then(function(r){ clearTimeout(t2); if (!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
             .then(function(text){
               console.log('[PR-sync] CSV via allorigins — bytes='+(text?text.length:0));
               applyPR(parsePartialRollsCSV(text), 'csv-allorigins');
             })
             .catch(function(err2){
+              clearTimeout(t2);
               console.warn('[PR-sync] all CSV attempts failed:', err2);
               failed.push('partialrolls');
               bumpProg();
