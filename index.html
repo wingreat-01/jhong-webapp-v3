@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_8.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_9.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -909,6 +909,7 @@ header{display:none!important}
       <button class="btn-secondary" onclick="clearWithdrawForm()">Clear Form</button>
       <button class="btn-primary" onclick="openSplitRollModal()" style="background:#FB8C00" title="Split a 48&quot; × 50yd parent roll into two 24&quot; × 50yd children — logs WITHDRAWAL + RECEIVED + SPLIT">✂ Split Roll</button>
       <button class="btn-primary" id="wExcessBtn" onclick="openExcessMaterialModal()" style="background:#FB8C00" title="Record excess material remaining after this withdrawal">📦 Excess Material</button>
+      <button class="btn-primary" onclick="openSendToYardsModal()" style="background:#00695C" title="Send this item to the 3M Roll Yard Ledger">▥ Send to Yards</button>
       <button class="btn-danger" onclick="openDisposalFromWd()" title="Record items being disposed of">🗑 Disposal</button>
       <span class="submit-pill" id="wSubmitPill" title="Backend save status"><span class="pill-dot"></span></span>
     </div>
@@ -1031,7 +1032,7 @@ header{display:none!important}
 <div class="tab-panel" id="tab-threemyards">
   <div class="section-header">
     <div class="section-title">▥ 3M Yards — Roll Ledger</div>
-    <span class="badge" id="threemYardsBadge">1 roll</span>
+    <span class="badge" id="threemYardsBadge">0 rolls</span>
   </div>
 
   <!-- Sub-tab nav: Add/Edit Roll | Withdraw Yards -->
@@ -1098,7 +1099,7 @@ header{display:none!important}
             <th style="width:110px">Actions</th>
           </tr>
         </thead>
-        <tbody id="threemYardsBody"><tr><td class="td-code">101</td><td class="td-code" style="color:#BF360C;font-weight:700">610-10-WHT-B1</td><td>3M 610-10 White B1</td><td><span class="pill pill-gray">48 x 50</span></td><td style="text-align:right;font-weight:700">50</td><td style="text-align:right;color:#C62828;font-weight:600">0</td><td style="text-align:right;font-weight:700;color:#2E7D32">50</td><td style="white-space:nowrap"><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFF8E1;color:#E65100;border-color:#FFE082;margin-right:4px" onclick="edit3MYardsRoll(&#39;101&#39;)">✎ Edit</button><button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#ECEFF1;color:#90A4AE;border-color:#CFD8DC;cursor:not-allowed" disabled="" title="Only ADMIN can delete rolls.">🔒 Del</button></td></tr></tbody>
+        <tbody id="threemYardsBody"><tr><td colspan="8"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">No rolls yet — add one above.</div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1448,6 +1449,42 @@ header{display:none!important}
 </div>
 
 <!-- ============ DISPOSAL modal ============ -->
+<!-- ============ Send to Yards Modal ============ -->
+<div class="split-modal-overlay" id="sendToYardsOverlay">
+  <div class="split-modal" role="dialog" aria-labelledby="sendToYardsModalTitle">
+    <button type="button" class="split-close-x" onclick="closeSendToYardsModal()" title="Close">×</button>
+    <h3 id="sendToYardsModalTitle" style="color:#00695C">▥ Send to Yards</h3>
+    <p class="split-sub">Add this item to the 3M Roll Yard Ledger. Fill in the core number and qty — item details are pre-filled from the withdrawal form.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0">
+      <div class="form-group">
+        <label class="form-label">Core No. *</label>
+        <input class="form-input" id="stysCoreNo" type="text" placeholder="e.g. C-3M-0001">
+      </div>
+      <div class="form-group ac-wrap">
+        <label class="form-label">Item ID *</label>
+        <input class="form-input" id="stysItemId" type="text" placeholder="Type to search ITEMCODE..." autocomplete="off" oninput="onStysItemInput()" onkeydown="onStysItemKey(event)" onfocus="onStysItemInput()" onblur="setTimeout(hideStysItemAC,180)">
+        <div class="ac-list" id="stysAcList"></div>
+      </div>
+      <div class="form-group" style="grid-column:span 2">
+        <label class="form-label">Item Description</label>
+        <input class="form-input" id="stysItemDesc" type="text" readonly="" placeholder="Auto-filled from ITEMCODE" style="background:#ECEFF1;color:#455A64">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Width</label>
+        <input class="form-input" id="stysWidth" type="text" placeholder="Auto-filled (you can override)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Qty (Yards) *</label>
+        <input class="form-input" id="stysQtyYards" type="number" placeholder="0" min="0" step="any">
+      </div>
+    </div>
+    <div class="split-actions" style="margin-top:4px">
+      <button type="button" class="split-btn-cancel" onclick="closeSendToYardsModal()">Cancel</button>
+      <button type="button" class="split-btn-confirm" onclick="confirmSendToYards()" style="background:#00695C">▥ Add to Yard Ledger</button>
+    </div>
+  </div>
+</div>
+
 <div class="split-modal-overlay" id="disposalOverlay">
   <div class="split-modal" role="dialog" aria-labelledby="disposalModalTitle">
     <button type="button" class="split-close-x" onclick="closeDisposalModal()" title="Close">×</button>
@@ -6790,6 +6827,152 @@ function _dspItemCodeKey(e) {
   else if (e.key === 'Enter') {
     if (_dspAcIndex >= 0 && _dspAcMatches[_dspAcIndex]) { e.preventDefault(); _dspPickItem(_dspAcMatches[_dspAcIndex].code); }
   } else if (e.key === 'Escape') { _dspHideItemAC(); }
+}
+
+// ============================================================
+// SEND TO YARDS MODAL
+// Opens from the Withdraw tab; pre-fills item details from the
+// withdrawal form, then saves to STATE.threeMYards and posts to
+// the YARDSRECEIVED sheet — identical logic to save3MYardsRoll().
+// ============================================================
+var _stysEscHandler = null;
+var _stysAcIndex = -1;
+
+function openSendToYardsModal() {
+  // Pre-fill item details from the active withdrawal form
+  var itemId  = (document.getElementById('wItemCode')  ? document.getElementById('wItemCode').value.trim()  : '');
+  var desc    = (document.getElementById('wDesc')       ? document.getElementById('wDesc').value.trim()      : '');
+  var width   = (document.getElementById('wSize')       ? document.getElementById('wSize').value.trim()      : '');
+
+  document.getElementById('stysCoreNo').value    = '';
+  document.getElementById('stysItemId').value    = itemId;
+  document.getElementById('stysItemDesc').value  = desc;
+  document.getElementById('stysWidth').value     = width;
+  document.getElementById('stysQtyYards').value  = '';
+
+  var overlay = document.getElementById('sendToYardsOverlay');
+  overlay.classList.add('show');
+
+  if (_stysEscHandler) document.removeEventListener('keydown', _stysEscHandler);
+  _stysEscHandler = function(e) { if (e.key === 'Escape') closeSendToYardsModal(); };
+  document.addEventListener('keydown', _stysEscHandler);
+
+  setTimeout(function(){ document.getElementById('stysCoreNo').focus(); }, 80);
+}
+
+function closeSendToYardsModal() {
+  document.getElementById('sendToYardsOverlay').classList.remove('show');
+  hideStysItemAC();
+  if (_stysEscHandler) { document.removeEventListener('keydown', _stysEscHandler); _stysEscHandler = null; }
+}
+
+function confirmSendToYards() {
+  var coreNo = (document.getElementById('stysCoreNo').value || '').trim();
+  var itemId = (document.getElementById('stysItemId').value || '').trim();
+  var desc   = (document.getElementById('stysItemDesc').value || '').trim();
+  var width  = (document.getElementById('stysWidth').value || '').trim();
+  var qty    = parseFloat(document.getElementById('stysQtyYards').value);
+
+  if (!coreNo) { showToast('Core No. is required', 'error'); return; }
+  if (!itemId) { showToast('Item ID is required', 'error'); return; }
+  if (isNaN(qty) || qty < 0) { showToast('Qty (Yards) must be 0 or greater', 'error'); return; }
+
+  // Auto-fill desc/width from ITEMCODE if still blank
+  if (!desc || !width) {
+    var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === itemId.toLowerCase(); });
+    if (match) {
+      itemId = match.code;
+      if (!desc)  desc  = match.desc || '';
+      if (!width) width = match.size || '';
+    }
+  }
+
+  var rolls = STATE.threeMYards = STATE.threeMYards || [];
+
+  // Block duplicate Core No.
+  if (rolls.some(function(r){ return (r.coreNo||'').toLowerCase() === coreNo.toLowerCase(); })) {
+    showToast('A roll with Core No. "'+coreNo+'" already exists in the Yard Ledger.', 'error');
+    return;
+  }
+
+  rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:0 });
+  saveState();
+  try { render3MYards(); } catch(e){}
+
+  // Save to YARDSRECEIVED sheet in JHONG BACKEND
+  var today3m = (function(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  })();
+  var recId = 'yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+  postToScript({action:'save_yardsreceived', record:{
+    id:       recId,
+    date:     today3m,
+    itemCode: itemId,
+    desc:     desc,
+    size:     width,
+    qty:      qty,
+    mrrNo:    coreNo,
+    supplier: '3M',
+    remarks:  '3M Yards Roll'
+  }},
+    function(){ showToast('✓ Added to Yard Ledger and saved to YARDSRECEIVED sheet.', 'success'); },
+    function(err){ showToast('Added locally — YARDSRECEIVED sync failed: '+err, 'error'); }
+  );
+
+  closeSendToYardsModal();
+}
+
+// ---------- Item ID autocomplete (Send to Yards modal) ----------
+function onStysItemInput() {
+  var v = (document.getElementById('stysItemId').value || '').trim();
+  _showStysAC(v);
+  var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
+  if (match) {
+    document.getElementById('stysItemDesc').value = match.desc || '';
+    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
+  }
+}
+function _showStysAC(v) {
+  var list = document.getElementById('stysAcList');
+  if (!list) return;
+  var q = (v||'').toLowerCase();
+  var items = STATE.items || [];
+  var matches = !q ? items.slice(0,30) : items.filter(function(it){
+    return (it.code||'').toLowerCase().indexOf(q) !== -1 || (it.desc||'').toLowerCase().indexOf(q) !== -1;
+  }).slice(0,30);
+  if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
+  list.innerHTML = matches.map(function(it, i){
+    return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault()" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
+      + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
+      + ' <span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
+      + '</div>';
+  }).join('');
+  list.style.display = 'block';
+}
+function hideStysItemAC() {
+  var list = document.getElementById('stysAcList');
+  if (list) { list.style.display = 'none'; list.innerHTML = ''; }
+  _stysAcIndex = -1;
+}
+function pickStysItem(code) {
+  document.getElementById('stysItemId').value = code;
+  var match = (STATE.items || []).find(function(it){ return it.code === code; });
+  if (match) {
+    document.getElementById('stysItemDesc').value = match.desc || '';
+    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
+  }
+  hideStysItemAC();
+  document.getElementById('stysQtyYards').focus();
+}
+function onStysItemKey(e) {
+  var list = document.getElementById('stysAcList');
+  if (!list || list.style.display === 'none') return;
+  var items = list.querySelectorAll('.ac-item');
+  if (e.key === 'ArrowDown')      { e.preventDefault(); _stysAcIndex = Math.min(_stysAcIndex+1, items.length-1); _showStysAC(document.getElementById('stysItemId').value.trim()); }
+  else if (e.key === 'ArrowUp')   { e.preventDefault(); _stysAcIndex = Math.max(_stysAcIndex-1, -1); _showStysAC(document.getElementById('stysItemId').value.trim()); }
+  else if (e.key === 'Enter')     { if (_stysAcIndex >= 0 && items[_stysAcIndex]) { e.preventDefault(); items[_stysAcIndex].click(); } }
+  else if (e.key === 'Escape')    { hideStysItemAC(); }
 }
 
 var _disposalEscHandler = null;
