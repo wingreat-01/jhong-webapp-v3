@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_11.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_12.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -3811,6 +3811,19 @@ function withdraw3MYards() {
   clear3MYardsWithdrawForm();
   renderTmyWithdrawals();
   render3MYards();
+  // Sync to YARDSWITHDRAWN sheet in JHONG BACKEND
+  postToScript({action:'save_yardswithdrawn', record: {
+    id:     entry.id,
+    date:   entry.date,
+    coreNo: entry.coreNo,
+    itemId: entry.itemId,
+    yards:  entry.yards,
+    ref:    entry.ref,
+    note:   entry.note
+  }},
+    function(){ /* saved */ },
+    function(err){ showToast('Yards withdrawal saved locally — YARDSWITHDRAWN sync failed: '+err, 'error'); }
+  );
 }
 
 function clear3MYardsWithdrawForm() {
@@ -3851,6 +3864,11 @@ function deleteTmyWithdrawal(id) {
   showToast('Withdrawal entry deleted.', 'success');
   renderTmyWithdrawals();
   render3MYards();
+  // Delete from YARDSWITHDRAWN sheet in JHONG BACKEND
+  postToScript({action:'delete_yardswithdrawn', id: id},
+    function(){ /* deleted */ },
+    function(err){ showToast('Deleted locally — YARDSWITHDRAWN sheet delete failed: '+err, 'error'); }
+  );
 }
 
 // ===========================================================
