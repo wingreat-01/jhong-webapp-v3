@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_1.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_2.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -594,7 +594,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">6/8</span>
+  <span class="sync-progress" id="syncIndicatorProgress">7/8</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1184,8 +1184,6 @@ header{display:none!important}
       <input class="form-input" id="tmyStockFilter" placeholder="Filter by Core No., Item ID, or description..." oninput="renderYardsStock()" style="flex:1;min-width:220px">
       <button class="btn-secondary" onclick="document.getElementById(&#39;tmyStockFilter&#39;).value=&#39;&#39;;renderYardsStock()">Clear</button>
     </div>
-    <!-- Summary stat cards -->
-    <div class="stat-grid" id="yardsStockSummaryCards" style="margin-bottom:14px"></div>
     <div class="card">
       <div class="table-wrap">
         <table>
@@ -1338,8 +1336,6 @@ header{display:none!important}
         <input class="form-input" id="prStockFilter" placeholder="Filter by Item Code or description..." oninput="renderPartialRollsStock()" style="flex:1;min-width:220px">
         <button class="btn-secondary" onclick="document.getElementById(&#39;prStockFilter&#39;).value=&#39;&#39;;renderPartialRollsStock()">Clear</button>
       </div>
-      <!-- Summary stat cards -->
-      <div class="stat-grid" id="prStockSummaryCards" style="margin-bottom:14px"></div>
       <div class="card">
         <div class="table-wrap">
           <table>
@@ -4367,7 +4363,6 @@ function deletePrWithdrawal(id) {
 function renderYardsStock() {
   var body  = document.getElementById('yardsStockBody');
   var foot  = document.getElementById('yardsStockFoot');
-  var cards = document.getElementById('yardsStockSummaryCards');
   if (!body) return;
 
   var q = ((document.getElementById('tmyStockFilter') || {}).value || '').toLowerCase().trim();
@@ -4393,7 +4388,6 @@ function renderYardsStock() {
       + (rolls.length ? 'No rolls match your filter.' : 'No stock data yet — add rolls under Add / Edit Roll.')
       + '</div></div></td></tr>';
     if (foot) foot.style.display = 'none';
-    if (cards) cards.innerHTML = '';
     return;
   }
 
@@ -4433,16 +4427,6 @@ function renderYardsStock() {
       tbal.style.color = totBal <= 0 ? '#C62828' : '#1B5E20';
     }
   }
-
-  // Summary stat cards
-  if (cards) {
-    var utilized = totRec > 0 ? Math.round((totWd / totRec) * 100) : 0;
-    cards.innerHTML =
-      '<div class="stat-card" style="--accent:#1565C0"><div class="stat-label">Total Received</div><div class="stat-value">'+totRec.toLocaleString()+'</div><div class="stat-sub">yards across '+filtered.length+' roll'+(filtered.length===1?'':'s')+'</div></div>'
-    + '<div class="stat-card" style="--accent:#C62828"><div class="stat-label">Total Withdrawn</div><div class="stat-value">'+totWd.toLocaleString()+'</div><div class="stat-sub">yards disbursed</div></div>'
-    + '<div class="stat-card" style="--accent:'+(totBal<=0?'#C62828':'#2E7D32')+'"><div class="stat-label">Available Balance</div><div class="stat-value">'+totBal.toLocaleString()+'</div><div class="stat-sub">yards remaining</div></div>'
-    + '<div class="stat-card" style="--accent:#F57F17"><div class="stat-label">Utilization</div><div class="stat-value">'+utilized+'%</div><div class="stat-sub">of total received used</div></div>';
-  }
 }
 
 // ===========================================================
@@ -4453,7 +4437,6 @@ function renderYardsStock() {
 function renderPartialRollsStock() {
   var body  = document.getElementById('prStockBody');
   var foot  = document.getElementById('prStockFoot');
-  var cards = document.getElementById('prStockSummaryCards');
   if (!body) return;
 
   var q = ((document.getElementById('prStockFilter') || {}).value || '').toLowerCase().trim();
@@ -4506,7 +4489,6 @@ function renderPartialRollsStock() {
       + (allRows.length ? 'No records match your filter.' : 'No partial rolls stock data yet.')
       + '</div></div></td></tr>';
     if (foot) foot.style.display = 'none';
-    if (cards) cards.innerHTML = '';
     return;
   }
 
@@ -4539,16 +4521,6 @@ function renderPartialRollsStock() {
       tbal2.textContent = totBal.toLocaleString();
       tbal2.style.color = totBal <= 0 ? '#C62828' : '#1B5E20';
     }
-  }
-
-  // Summary stat cards
-  if (cards) {
-    var utilized2 = totAdd > 0 ? Math.round((totWd / totAdd) * 100) : 0;
-    cards.innerHTML =
-      '<div class="stat-card" style="--accent:#1565C0"><div class="stat-label">Total Added</div><div class="stat-value">'+totAdd.toLocaleString()+'</div><div class="stat-sub">across '+filtered.length+' item'+(filtered.length===1?'':'s')+'</div></div>'
-    + '<div class="stat-card" style="--accent:#C62828"><div class="stat-label">Total Withdrawn</div><div class="stat-value">'+totWd.toLocaleString()+'</div><div class="stat-sub">partial rolls disbursed</div></div>'
-    + '<div class="stat-card" style="--accent:'+(totBal<=0?'#C62828':'#2E7D32')+'"><div class="stat-label">Available Balance</div><div class="stat-value">'+totBal.toLocaleString()+'</div><div class="stat-sub">remaining in stock</div></div>'
-    + '<div class="stat-card" style="--accent:#F57F17"><div class="stat-label">Utilization</div><div class="stat-value">'+utilized2+'%</div><div class="stat-sub">of total added used</div></div>';
   }
 }
 
