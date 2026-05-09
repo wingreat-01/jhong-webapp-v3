@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_3.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_4.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -650,7 +650,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">6/8</span>
+  <span class="sync-progress" id="syncIndicatorProgress">7/8</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -2219,6 +2219,7 @@ function parseItemcodeRows(rows) {
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
   var codeIdx = -1, descIdx = -1, sizeIdx = -1, qtyIdx = -1;
   var widthValIdx = -1, widthUnitIdx = -1, lengthValIdx = -1, lengthUnitIdx = -1;
+  var stockingIdx = -1;
 
   header.forEach(function(h, i){
     if (h === 'item code' || h === 'itemcode' || h === 'code') codeIdx = i;
@@ -2228,6 +2229,7 @@ function parseItemcodeRows(rows) {
     if (h === 'width unit' || h === 'wunit') widthUnitIdx = i;
     if (h === 'length') lengthValIdx = i;
     if (h === 'length unit' || h === 'lunit') lengthUnitIdx = i;
+    if (h === 'stocking' || h === 'stocking unit' || h === 'stock unit' || h === 'uom') stockingIdx = i;
     if (qtyIdx === -1 && (h.indexOf('qty') !== -1 || h.indexOf('stock') !== -1 || h.indexOf('available') !== -1 || h.indexOf('quantity') !== -1 || h.indexOf('on hand') !== -1)) qtyIdx = i;
   });
 
@@ -2239,6 +2241,8 @@ function parseItemcodeRows(rows) {
     widthValIdx = 3; widthUnitIdx = 4; lengthValIdx = 5; lengthUnitIdx = 6;
     hasSplitSize = true;
   }
+  // Column G (index 6) = Stocking; positional fallback only if header-based detection missed it
+  if (stockingIdx === -1 && header.length >= 7) stockingIdx = 6;
   if (!hasSplitSize && sizeIdx === -1) sizeIdx = 2;
 
   var results = [];
@@ -2271,7 +2275,9 @@ function parseItemcodeRows(rows) {
       origQty = isNaN(n) ? 0 : n;
     }
 
-    results.push({code: code, desc: desc, size: size, origQty: origQty});
+    var stocking = stockingIdx >= 0 ? String(cols[stockingIdx]||'').trim().toUpperCase() : '';
+
+    results.push({code: code, desc: desc, size: size, origQty: origQty, stocking: stocking});
   }
   return results;
 }
@@ -8703,6 +8709,32 @@ function auditGenerate() {
 }
 
 // ---- MAIN STOCKS: Balance ----
+// ---- Area computation helper ----
+// Returns { areaTotal: number, areaUnit: 'SQFT'|'SQM'|null } for a balance row.
+// stocking: the ITEMCODE column G value (e.g. 'SQFT', 'SQM', 'ROLLS', 'PC', 'SHEETS')
+// size: the item size string (e.g. '48FT x 50FT' or '1.22m x 50m')
+// balance: the current balance quantity (rolls/units to multiply by area-per-unit)
+function _auditComputeArea(stocking, size, balance) {
+  var s = (stocking || '').toUpperCase().trim();
+  if (s !== 'SQFT' && s !== 'SQM') return { areaTotal: null, areaUnit: null };
+
+  // Try to parse width and length from size string, e.g. "48FT x 50FT", "1.22m x 50m", "48 x 50"
+  var area = null;
+  if (size) {
+    // Normalize × → x and split
+    var parts = size.replace(/[×xX]/g, 'x').split('x');
+    if (parts.length >= 2) {
+      var wNum = parseFloat(parts[0].replace(/[^\d.]/g, ''));
+      var lNum = parseFloat(parts[1].replace(/[^\d.]/g, ''));
+      if (!isNaN(wNum) && !isNaN(lNum) && wNum > 0 && lNum > 0) {
+        var areaPerUnit = wNum * lNum;
+        area = areaPerUnit * (parseFloat(balance) || 0);
+      }
+    }
+  }
+  return { areaTotal: area, areaUnit: area !== null ? s : null };
+}
+
 function _auditBuildMainBalance(codeQ, descQ) {
   var rows = [];
   (STATE.items || []).forEach(function(it) {
@@ -8713,6 +8745,8 @@ function _auditBuildMainBalance(codeQ, descQ) {
     var rec = 0; (STATE.received||[]).forEach(function(r){ if(r.itemCode===it.code) rec += parseFloat(r.qty)||0; });
     var wdh = 0; (STATE.withdrawals||[]).forEach(function(w){ if(w.itemCode===it.code) wdh += parseFloat(w.qty)||0; });
     var balance = origQty + beg + rec - wdh;
+    var stocking = it.stocking || '';
+    var areaInfo = _auditComputeArea(stocking, it.size || '', balance);
     rows.push({
       date: '—',
       txnType: 'BALANCE',
@@ -8724,6 +8758,9 @@ function _auditBuildMainBalance(codeQ, descQ) {
       received: rec,
       withdrawn: wdh,
       balance: balance,
+      stocking: stocking,
+      areaTotal: areaInfo.areaTotal,
+      areaUnit: areaInfo.areaUnit,
       ref: '—',
       supplier: '—',
       customer: '—',
@@ -8879,12 +8916,15 @@ function _auditRender(rows, title, report, ledger) {
 
   // Summaries
   var totalQty = 0, totalRec = 0, totalWdh = 0, totalBal = 0, uniqueCodes = {};
+  var totalSqft = 0, totalSqm = 0, hasSqft = false, hasSqm = false;
   rows.forEach(function(r){
     uniqueCodes[r.code] = 1;
     totalQty += parseFloat(r.qty)||0;
     totalRec += parseFloat(r.received)||0;
     totalWdh += parseFloat(r.withdrawn)||0;
     totalBal += parseFloat(r.balance)||0;
+    if (r.areaUnit === 'SQFT' && r.areaTotal !== null) { totalSqft += r.areaTotal; hasSqft = true; }
+    if (r.areaUnit === 'SQM'  && r.areaTotal !== null) { totalSqm  += r.areaTotal; hasSqm  = true; }
   });
   var uniqueCount = Object.keys(uniqueCodes).length;
 
@@ -8897,6 +8937,12 @@ function _auditRender(rows, title, report, ledger) {
     summaryHtml += '<div class="audit-stat"><div class="audit-stat-lbl">Total Received</div><div class="audit-stat-val" style="color:#2E7D32">'+totalRec+'</div><div class="audit-stat-sub">units</div></div>'
       + '<div class="audit-stat"><div class="audit-stat-lbl">Total Withdrawn</div><div class="audit-stat-val" style="color:#C62828">'+totalWdh+'</div><div class="audit-stat-sub">units</div></div>'
       + '<div class="audit-stat"><div class="audit-stat-lbl">Net Balance</div><div class="audit-stat-val" style="color:'+(totalBal>=0?'#1565C0':'#C62828')+'">'+totalBal+'</div><div class="audit-stat-sub">units on hand</div></div>';
+    if (hasSqft) {
+      summaryHtml += '<div class="audit-stat"><div class="audit-stat-lbl">Total Area (SQFT)</div><div class="audit-stat-val" style="color:#6A1B9A">'+totalSqft.toFixed(2)+'</div><div class="audit-stat-sub">sq ft on hand</div></div>';
+    }
+    if (hasSqm) {
+      summaryHtml += '<div class="audit-stat"><div class="audit-stat-lbl">Total Area (SQM)</div><div class="audit-stat-val" style="color:#6A1B9A">'+totalSqm.toFixed(2)+'</div><div class="audit-stat-sub">sq m on hand</div></div>';
+    }
   } else {
     summaryHtml += '<div class="audit-stat"><div class="audit-stat-lbl">Total Qty</div><div class="audit-stat-val">'+totalQty+'</div><div class="audit-stat-sub">units</div></div>';
   }
@@ -8905,7 +8951,7 @@ function _auditRender(rows, title, report, ledger) {
   // Table header
   var thHtml = '';
   if (isBalance && ledger === 'main') {
-    thHtml = '<tr><th>#</th><th>Item Code</th><th>Description</th><th>Size</th><th>Opening</th><th>Beginning</th><th>Received</th><th>Withdrawn</th><th>Balance</th></tr>';
+    thHtml = '<tr><th>#</th><th>Item Code</th><th>Description</th><th>Size</th><th>Stocking</th><th>Opening</th><th>Beginning</th><th>Received</th><th>Withdrawn</th><th>Balance</th><th>Area Total</th></tr>';
   } else if (isBalance) {
     thHtml = '<tr><th>#</th><th>Core / Code</th><th>Description</th><th>Size / Width</th><th>Received</th><th>Withdrawn</th><th>Remaining</th></tr>';
   } else {
@@ -8918,16 +8964,23 @@ function _auditRender(rows, title, report, ledger) {
     var rowN = i + 1;
     if (isBalance && ledger === 'main') {
       var balColor = (r.balance||0) <= 0 ? '#C62828' : ((r.balance||0) < 5 ? '#E65100' : '#1565C0');
+      var areaCell = '—';
+      if (r.areaTotal !== null && r.areaUnit) {
+        areaCell = '<span style="color:#6A1B9A;font-weight:600">'+r.areaTotal.toFixed(2)+'</span> <span style="font-size:10px;color:#9C27B0">'+r.areaUnit+'</span>';
+      }
+      var stockingPill = r.stocking ? '<span class="pill pill-gray" style="font-size:10px">'+escapeHtml(r.stocking)+'</span>' : '—';
       bodyHtml += '<tr>'
         + '<td style="color:#90A4AE;font-size:11px">'+rowN+'</td>'
         + '<td class="td-code">'+escapeHtml(r.code)+'</td>'
         + '<td>'+escapeHtml(r.desc)+'</td>'
         + '<td><span class="pill pill-gray">'+escapeHtml(r.size||'—')+'</span></td>'
+        + '<td style="text-align:center">'+stockingPill+'</td>'
         + '<td style="text-align:right">'+escapeHtml(String(r.opening||0))+'</td>'
         + '<td style="text-align:right">'+escapeHtml(String(r.beginning||0))+'</td>'
         + '<td style="text-align:right"><span class="audit-pill-received">'+escapeHtml(String(r.received||0))+'</span></td>'
         + '<td style="text-align:right"><span class="audit-pill-withdrawn">'+escapeHtml(String(r.withdrawn||0))+'</span></td>'
         + '<td style="text-align:right;font-weight:700;color:'+balColor+'">'+escapeHtml(String(r.balance||0))+'</td>'
+        + '<td style="text-align:right">'+areaCell+'</td>'
         + '</tr>';
     } else if (isBalance) {
       var remColor = (r.balance||0) <= 0 ? '#C62828' : '#1565C0';
