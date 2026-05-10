@@ -2353,15 +2353,35 @@ function parseWithdrawalRows(rows) {
 function parseYardsReceivedRows(rows) {
   if (!rows || rows.length < 2) return [];
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
-  function col(name){ return header.indexOf(name); }
-  var iDate = col('date'),     iCode = col('itemcode'), iDesc = col('description'),
-      iSize = col('size'),     iQty  = col('qty'),      iMrr  = col('mrr'),
-      iSup  = col('supplier'), iRem  = col('remarks'),  iId   = col('id'),
-      iDel  = col('deleted');
-  // Fallback to canonical column positions matching YARDSRECEIVED_HEADER:
-  // [Date, ItemCode, Description, Size, Qty, MRR, Supplier, Remarks, ID, Deleted, ...]
+  // Try multiple aliases for each column, then fall back to the canonical
+  // 0-based position from YARDSRECEIVED_HEADER so sheets with slightly
+  // different column names (e.g. "Qty (Yards)", "Width", "Desc") still parse.
+  function col1(names) {
+    for (var i = 0; i < names.length; i++) {
+      var idx = header.indexOf(names[i]);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+  var iDate = col1(['date','orderdate']);
+  var iCode = col1(['itemcode','item code','item_code','code','itemid','item id']);
+  var iDesc = col1(['description','desc','itemdesc','item description']);
+  var iSize = col1(['size','width','dimensions']);
+  var iQty  = col1(['qty','quantity','qty (yards)','qty(yards)','yards','qtyyards']);
+  var iMrr  = col1(['mrr','mrr no','mrrno','mrr no.','core no','coreno','core no.','coreno.','mrrno.']);
+  var iSup  = col1(['supplier']);
+  var iRem  = col1(['remarks','notes','note']);
+  var iId   = col1(['id']);
+  var iDel  = col1(['deleted']);
+  // Positional fallbacks (YARDSRECEIVED_HEADER canonical order):
+  // [Date(0), ItemCode(1), Description(2), Size(3), Qty(4), MRR(5), Supplier(6), Remarks(7), ID(8), Deleted(9)]
+  if (iDate < 0) iDate = 0;
   if (iCode < 0) iCode = 1;
+  if (iDesc < 0) iDesc = 2;
+  if (iSize < 0) iSize = 3;
+  if (iQty  < 0) iQty  = 4;
   if (iMrr  < 0) iMrr  = 5;
+  if (iSup  < 0) iSup  = 6;
   if (iRem  < 0) iRem  = 7;
   if (iId   < 0) iId   = 8;
   if (iDel  < 0) iDel  = 9;
@@ -2376,9 +2396,9 @@ function parseYardsReceivedRows(rows) {
     out.push({
       coreNo:     coreNo,
       itemId:     code,
-      itemDesc:   iDesc >= 0 ? String(r[iDesc]||'').trim() : '',
-      width:      iSize >= 0 ? String(r[iSize]||'').trim() : '',
-      qtyYards:   iQty  >= 0 ? (parseFloat(r[iQty])||0)   : 0,
+      itemDesc:   String(r[iDesc]||'').trim(),
+      width:      String(r[iSize]||'').trim(),
+      qtyYards:   parseFloat(r[iQty]) || 0,
       withdrawn:  0,    // restored from local state in the merge step
       remarks:    String(r[iRem]||'').trim(),
       _backendId: String(r[iId]||'').trim()
