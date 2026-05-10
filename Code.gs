@@ -182,12 +182,24 @@ function _handleWrite(body) {
   if (action === 'save_withdrawal') {
     var r = body.record || {};
     if (!r.itemCode) return _json({ok:false, error:'Missing itemCode'});
-    var id = r.id || _genId('whd');
+    // Synthesized legacy IDs (whd_legacy_r*) are never written to the sheet,
+    // so _findRowById will never find them. Treat them as "no ID" and generate
+    // a real one so the row becomes trackable after the first edit.
+    var rawId = String(r.id || '').trim();
+    var id = (rawId && !/^whd_legacy_/.test(rawId)) ? rawId : _genId('whd');
     var sh = _getWithdrawalSheet();
     var existing = _findRowById(sh, 9, id);
     var row = [r.date||'', String(r.itemCode), r.desc||'', r.size||'', Number(r.qty)||0, r.withdrawalNo||'', r.customer||'', r.remarks||'', id, false, '', ''];
-    if (existing === -1) sh.appendRow(row);
-    else sh.getRange(existing, 1, 1, row.length).setValues([row]);
+    if (existing !== -1) {
+      sh.getRange(existing, 1, 1, row.length).setValues([row]);
+    } else {
+      // Legacy fallback: the row existed before the ID column was added.
+      // Frontend sends _sheetRow (1-based) so we can overwrite it directly
+      // instead of appending a duplicate.
+      var legacyRow = parseInt(r._sheetRow || 0);
+      if (legacyRow > 1) sh.getRange(legacyRow, 1, 1, row.length).setValues([row]);
+      else sh.appendRow(row);
+    }
     return _json({ok:true, id:id});
   }
 

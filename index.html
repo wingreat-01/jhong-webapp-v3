@@ -3127,6 +3127,9 @@ function submitWithdrawal() {
       function(res){
         rec.id = (res && res.id) ? res.id : rec.id;
         rec.source = 'backend';
+        // If this was a legacy record, the backend just assigned it a real ID.
+        // Clear the legacy flags so future edits use the id-based upsert path.
+        if (rec._legacyNoId) { rec._legacyNoId = false; rec._sheetRow = null; }
         saveState();
         renderHistory();
         setSubmitPill('success', editingId ? '✓ Updated in backend' : '✓ Submitted to backend');
