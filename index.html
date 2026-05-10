@@ -3810,15 +3810,36 @@ function save3MYardsRoll() {
       showToast('Another roll already uses Core No. "'+coreNo+'"', 'error');
       return;
     }
-    rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks };
-    showToast('Roll updated.', 'success');
+    var existingBackendId = rolls[idx]._backendId || '';
+    rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks, _backendId: existingBackendId };
+    showToast('Roll updated — syncing to YARDSRECEIVED…', 'success');
+
+    // === Sync edit to YARDSRECEIVED sheet in JHONG BACKEND ===
+    // Uses the existing backend row ID so save_yardsreceived does an in-place
+    // update instead of appending a new row.
+    var editId3m = existingBackendId || ('yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5));
+    var today3mEdit = (function(){
+      var d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    })();
+    var editRec3m = { id: editId3m, date: today3mEdit, itemCode: itemId, desc: desc, size: width, qty: qty, mrrNo: coreNo, supplier: '3M', remarks: remarks || '3M Yards Roll' };
+    var _editIdx = idx; // capture for closure
+    postToScript({action:'save_yardsreceived', record: editRec3m},
+      function(res){
+        if (res && res.id) rolls[_editIdx]._backendId = res.id;
+        saveState();
+        showToast('Roll updated in YARDSRECEIVED sheet.', 'success');
+      },
+      function(err){ showToast('Updated locally — YARDSRECEIVED sync failed: '+err, 'error'); }
+    );
   } else {
     // Add — block duplicate Core No.
     if (rolls.some(function(r){ return (r.coreNo||'').toLowerCase() === coreNo.toLowerCase(); })) {
       showToast('A roll with Core No. "'+coreNo+'" already exists.', 'error');
       return;
     }
-    rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks });
+    var recId3m = 'yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+    rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks, _backendId: recId3m });
     showToast('Roll added — saving to YARDSRECEIVED…', 'success');
 
     // === Sync new roll to YARDSRECEIVED sheet in JHONG BACKEND ===
@@ -3828,7 +3849,6 @@ function save3MYardsRoll() {
         + String(d.getMonth()+1).padStart(2,'0') + '-'
         + String(d.getDate()).padStart(2,'0');
     })();
-    var recId3m = 'yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
     var recRec3m = {
       id:       recId3m,
       date:     today3m,
@@ -3842,6 +3862,7 @@ function save3MYardsRoll() {
     };
     postToScript({action:'save_yardsreceived', record: recRec3m},
       function(res){
+        if (res && res.id) rolls[0]._backendId = res.id;
         showToast('Roll saved — row added to YARDSRECEIVED sheet.', 'success');
       },
       function(err){
