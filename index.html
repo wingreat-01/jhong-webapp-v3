@@ -5697,10 +5697,12 @@ window.addEventListener('scroll', function(){ if (SEARCH_STATE.pickerOpen) showP
 
 // ---------- Tabs ----------
 function switchTab(tab) {
-  // Stop the Sales-Order live poll when leaving that tab — saves bandwidth
-  // and prevents background fetches from churning when the user is elsewhere.
+  // Stop per-tab live polls when leaving their respective tabs.
   if (STATE.activeTab === 'salesorder' && tab !== 'salesorder') {
     try { _soGsStopAutoRefresh(); } catch(e){}
+  }
+  if (STATE.activeTab === 'threemyards' && tab !== 'threemyards') {
+    try { _tmyStopAutoRefresh(); } catch(e){}
   }
   STATE.activeTab = tab;
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
@@ -5712,14 +5714,17 @@ function switchTab(tab) {
   if (tab === 'withdraw') setTimeout(function(){ var el=document.getElementById('wItemCode'); if (el) el.focus(); }, 50);
   if (tab === 'received') setTimeout(function(){ var el=document.getElementById('recItem'); if (el) el.focus(); }, 50);
   if (tab === 'search')   setTimeout(function(){ var el=document.getElementById('globalSearch'); if (el) el.focus(); }, 50);
-  if (tab === 'threemyards') setTimeout(function(){
-    try { render3MYards(); } catch(e){}
-    try { renderTmyWithdrawals(); } catch(e){}
-    try { switchTmySubTab(STATE._tmySubTab || 'add'); } catch(e){}
-    var which = STATE._tmySubTab || 'add';
-    var el = document.getElementById(which === 'withdraw' ? 'tmyWdCoreNo' : 'tmyCoreNo');
-    if (el) el.focus();
-  }, 50);
+  if (tab === 'threemyards') {
+    try { _tmyStartAutoRefresh(); } catch(e){}   // immediate fetch + start live poll
+    setTimeout(function(){
+      try { render3MYards(); } catch(e){}
+      try { renderTmyWithdrawals(); } catch(e){}
+      try { switchTmySubTab(STATE._tmySubTab || 'add'); } catch(e){}
+      var which = STATE._tmySubTab || 'add';
+      var el = document.getElementById(which === 'withdraw' ? 'tmyWdCoreNo' : 'tmyCoreNo');
+      if (el) el.focus();
+    }, 50);
+  }
   if (tab === 'partialrolls') setTimeout(function(){
     try { switchPrSubTab(STATE._prSubTab || 'ledger'); } catch(e){}
     try { renderPartialRolls(); } catch(e){}
@@ -6118,6 +6123,51 @@ function _soGsStartAutoRefresh() {
 function _soGsStopAutoRefresh() {
   if (_soGsAutoRefreshTimer) { clearInterval(_soGsAutoRefreshTimer); _soGsAutoRefreshTimer = null; }
   _soGsUpdateLiveBadge('off');
+}
+
+// =====================================================================
+//  3M YARDS — live auto-refresh (polls YARDSRECEIVED via Apps Script)
+//  Starts when the user opens the 3M Yards tab, stops on tab leave.
+// =====================================================================
+var _tmyAutoRefreshMs    = 30000;   // 30 s — new backend rows appear quickly
+var _tmyAutoRefreshTimer = null;
+var _tmyLastRefreshTs    = null;
+
+function _tmyStartAutoRefresh() {
+  if (_tmyAutoRefreshTimer) return;  // already running
+  _tmyAutoRefreshTick();             // immediate first tick
+  _tmyAutoRefreshTimer = setInterval(_tmyAutoRefreshTick, _tmyAutoRefreshMs);
+}
+
+function _tmyStopAutoRefresh() {
+  if (_tmyAutoRefreshTimer) { clearInterval(_tmyAutoRefreshTimer); _tmyAutoRefreshTimer = null; }
+}
+
+function _tmyAutoRefreshTick() {
+  if (!STATE.config.proxyUrl) return;
+  fetchFromAppsScript('read_yardsreceived',
+    function(rows) {
+      var parsed = parseYardsReceivedRows(rows || []);
+      var backendHasDataRows = (rows || []).length > 1;
+      if (parsed.length > 0 || !backendHasDataRows) {
+        var existing = STATE.threeMYards || [];
+        STATE.threeMYards = parsed.map(function(r) {
+          var loc = existing.find(function(e) {
+            return (e.coreNo||'').toLowerCase() === (r.coreNo||'').toLowerCase();
+          });
+          r.withdrawn = loc ? (parseFloat(loc.withdrawn)||0) : 0;
+          r.remarks   = r.remarks || (loc ? (loc.remarks||'') : '');
+          return r;
+        });
+        try { render3MYards(); } catch(e) {}
+        saveState();
+      } else {
+        console.warn('[TMY-refresh] backend returned rows but parser yielded 0 — keeping local state.');
+      }
+      _tmyLastRefreshTs = new Date();
+    },
+    function(err) { console.warn('[TMY-refresh]', err); }
+  );
 }
 
 function _soGsToggleAutoRefresh(on) {
