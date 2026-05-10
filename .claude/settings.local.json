@@ -7,7 +7,10 @@
       "Bash(grep -c *)",
       "Bash(grep -E *)",
       "Bash(grep -n *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
