@@ -1125,6 +1125,10 @@ header{display:none!important}
           <label class="form-label">Qty (Yards) *</label>
           <input class="form-input" type="number" id="tmyQtyYards" placeholder="0" min="0" step="any">
         </div>
+        <div class="form-group">
+          <label class="form-label">Remarks</label>
+          <input class="form-input" type="text" id="tmyRemarks" placeholder="Optional notes">
+        </div>
 
       </div>
       <div class="btn-row">
@@ -1154,10 +1158,11 @@ header{display:none!important}
             <th style="text-align:right">Qty (Yards)</th>
             <th style="text-align:right">Withdrawn</th>
             <th style="text-align:right">Available</th>
+            <th>Remarks</th>
             <th style="width:110px">Actions</th>
           </tr>
         </thead>
-        <tbody id="threemYardsBody"><tr><td colspan="8"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">No rolls yet — add one above.</div></div></td></tr></tbody>
+        <tbody id="threemYardsBody"><tr><td colspan="9"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">No rolls yet — add one above.</div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -3719,7 +3724,7 @@ function renderTmyRollFilter() {
   if (badge) badge.textContent = rows.length + (rows.length === 1 ? ' roll' : ' rolls');
   if (!body) return;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">'
+    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">▥</div><div class="empty-text">'
       + (allRolls.length ? 'No rolls match your filter.' : 'No rolls yet — add one above.')
       + '</div></div></td></tr>';
     return;
@@ -3739,6 +3744,7 @@ function renderTmyRollFilter() {
          + '<td style="text-align:right;font-weight:700">'+qty+'</td>'
          + '<td style="text-align:right;color:#C62828;font-weight:600">'+wd+'</td>'
          + '<td style="text-align:right;font-weight:700;color:'+availColor+'">'+avail+'</td>'
+         + '<td style="color:#546E7A;font-size:12px">'+escapeHtml(r.remarks||'')+'</td>'
          + '<td style="white-space:nowrap">'
          + '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#FFF8E1;color:#E65100;border-color:#FFE082;margin-right:4px" onclick="edit3MYardsRoll(\''+safeCore+'\')">✎ Edit</button>'
          + (STATE._isAdmin
@@ -3756,6 +3762,7 @@ function save3MYardsRoll() {
   var desc    = (document.getElementById('tmyItemDesc').value || '').trim();
   var width   = (document.getElementById('tmyWidth').value || '').trim();
   var qty     = parseFloat(document.getElementById('tmyQtyYards').value);
+  var remarks = (document.getElementById('tmyRemarks').value || '').trim();
   if (!coreNo) { showToast('Core No. is required', 'error'); return; }
   if (!itemId) { showToast('Item ID is required', 'error'); return; }
   if (isNaN(qty) || qty < 0) { showToast('Qty (Yards) must be 0 or greater', 'error'); return; }
@@ -3789,7 +3796,7 @@ function save3MYardsRoll() {
       showToast('Another roll already uses Core No. "'+coreNo+'"', 'error');
       return;
     }
-    rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd };
+    rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks };
     showToast('Roll updated.', 'success');
   } else {
     // Add — block duplicate Core No.
@@ -3797,7 +3804,7 @@ function save3MYardsRoll() {
       showToast('A roll with Core No. "'+coreNo+'" already exists.', 'error');
       return;
     }
-    rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd });
+    rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks });
     showToast('Roll added — saving to YARDSRECEIVED…', 'success');
 
     // === Sync new roll to YARDSRECEIVED sheet in JHONG BACKEND ===
@@ -3815,9 +3822,9 @@ function save3MYardsRoll() {
       desc:     desc,
       size:     width,
       qty:      qty,
-      mrrNo:    coreNo,   // Core No. → MRR column
+      mrrNo:    coreNo,
       supplier: '3M',
-      remarks:  '3M Yards Roll'
+      remarks:  remarks || '3M Yards Roll'
     };
     postToScript({action:'save_yardsreceived', record: recRec3m},
       function(res){
@@ -3843,6 +3850,7 @@ function edit3MYardsRoll(coreNo) {
   document.getElementById('tmyItemDesc').value  = r.itemDesc || '';
   document.getElementById('tmyWidth').value     = r.width || '';
   document.getElementById('tmyQtyYards').value  = r.qtyYards != null ? r.qtyYards : '';
+  document.getElementById('tmyRemarks').value   = r.remarks || '';
   var btn = document.getElementById('tmySubmitBtn');
   if (btn) { btn.textContent = '✓ Update Roll'; btn.style.background = '#E65100'; }
   document.getElementById('tmyCoreNo').scrollIntoView({behavior:'smooth', block:'center'});
@@ -3869,7 +3877,7 @@ function delete3MYardsRoll(coreNo) {
 }
 
 function clear3MYardsForm() {
-  ['tmyCoreNo','tmyItemId','tmyItemDesc','tmyWidth','tmyQtyYards'].forEach(function(id){
+  ['tmyCoreNo','tmyItemId','tmyItemDesc','tmyWidth','tmyQtyYards','tmyRemarks'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
