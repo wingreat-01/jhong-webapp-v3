@@ -5701,6 +5701,9 @@ function switchTab(tab) {
   if (STATE.activeTab === 'threemyards' && tab !== 'threemyards') {
     try { _tmyStopAutoRefresh(); } catch(e){}
   }
+  if (STATE.activeTab === 'withdraw' && tab !== 'withdraw') {
+    try { _wdrawStopAutoRefresh(); } catch(e){}
+  }
   STATE.activeTab = tab;
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
@@ -5708,7 +5711,10 @@ function switchTab(tab) {
   var tabs = ['stocks','beginning','withdraw','salesorder','served','received','threemyards','partialrolls','search','audit'];
   var idx = tabs.indexOf(tab);
   if (idx >= 0) document.querySelectorAll('.nav-tab')[idx].classList.add('active');
-  if (tab === 'withdraw') setTimeout(function(){ var el=document.getElementById('wItemCode'); if (el) el.focus(); }, 50);
+  if (tab === 'withdraw') {
+    try { _wdrawStartAutoRefresh(); } catch(e){}
+    setTimeout(function(){ var el=document.getElementById('wItemCode'); if (el) el.focus(); }, 50);
+  }
   if (tab === 'received') setTimeout(function(){ var el=document.getElementById('recItem'); if (el) el.focus(); }, 50);
   if (tab === 'search')   setTimeout(function(){ var el=document.getElementById('globalSearch'); if (el) el.focus(); }, 50);
   if (tab === 'threemyards') {
@@ -6164,6 +6170,40 @@ function _tmyAutoRefreshTick() {
       _tmyLastRefreshTs = new Date();
     },
     function(err) { console.warn('[TMY-refresh]', err); }
+  );
+}
+
+// =====================================================================
+//  WITHDRAW TAB — live auto-refresh (polls WITHDRAWAL sheet every 30 s)
+//  Starts when the user opens the Withdraw tab, stops on tab leave.
+// =====================================================================
+var _wdrawAutoRefreshMs    = 30000;
+var _wdrawAutoRefreshTimer = null;
+
+function _wdrawStartAutoRefresh() {
+  if (_wdrawAutoRefreshTimer) return;
+  _wdrawAutoRefreshTick();
+  _wdrawAutoRefreshTimer = setInterval(_wdrawAutoRefreshTick, _wdrawAutoRefreshMs);
+}
+
+function _wdrawStopAutoRefresh() {
+  if (_wdrawAutoRefreshTimer) { clearInterval(_wdrawAutoRefreshTimer); _wdrawAutoRefreshTimer = null; }
+}
+
+function _wdrawAutoRefreshTick() {
+  if (!STATE.config.proxyUrl) return;
+  fetchFromAppsScript('read_withdrawals',
+    function(rows) {
+      var parsed = parseWithdrawalRows(rows);
+      if (parsed && parsed.length > 0) {
+        var localW = (STATE.withdrawals || []).filter(function(r){ return r.source === 'local'; });
+        STATE.withdrawals = parsed.concat(localW);
+        try { renderHistory(); } catch(e){}
+        try { renderStocks();  } catch(e){}
+        saveState();
+      }
+    },
+    function(err) { console.warn('[WDRAW-refresh]', err); }
   );
 }
 
