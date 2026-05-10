@@ -229,12 +229,18 @@ function _handleWrite(body) {
   if (action === 'save_received') {
     var r2 = body.record || {};
     if (!r2.itemCode) return _json({ok:false, error:'Missing itemCode'});
-    var rid = r2.id || _genId('rec');
+    var rawRid = String(r2.id || '').trim();
+    var rid = (rawRid && !/^rec_legacy_/.test(rawRid)) ? rawRid : _genId('rec');
     var rsh = _getReceivedSheet();
     var rexisting = _findRowById(rsh, 9, rid);
     var rrow = [r2.date||'', String(r2.itemCode), r2.desc||'', r2.size||'', Number(r2.qty)||0, r2.mrrNo||'', r2.supplier||'', r2.remarks||'', rid, false, '', ''];
-    if (rexisting === -1) rsh.appendRow(rrow);
-    else rsh.getRange(rexisting, 1, 1, rrow.length).setValues([rrow]);
+    if (rexisting !== -1) {
+      rsh.getRange(rexisting, 1, 1, rrow.length).setValues([rrow]);
+    } else {
+      var rLegacyRow = parseInt(r2._sheetRow || 0);
+      if (rLegacyRow > 1) rsh.getRange(rLegacyRow, 1, 1, rrow.length).setValues([rrow]);
+      else rsh.appendRow(rrow);
+    }
     return _json({ok:true, id:rid});
   }
 

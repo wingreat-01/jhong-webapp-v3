@@ -6014,7 +6014,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
       }
       if (parsed) {
         var localW = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
-        STATE.withdrawals = parsed.concat(localW);
+        STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); renderStocks(); } catch(e){}
       }
       done();
@@ -6213,6 +6213,19 @@ function _tmyAutoRefreshTick() {
 //  WITHDRAW TAB — live auto-refresh (polls WITHDRAWAL sheet every 30 s)
 //  Starts when the user opens the Withdraw tab, stops on tab leave.
 // =====================================================================
+// Deduplicate withdrawal array by id. parsed (backend) comes first in the
+// concat so when a backend row and a local row share the same id, the
+// backend version wins.
+function _dedupeWithdrawals(arr) {
+  var seen = Object.create(null);
+  return arr.filter(function(r) {
+    var key = r.id || ('__noId_' + Math.random());
+    if (seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
+
 var _wdrawAutoRefreshMs    = 30000;
 var _wdrawAutoRefreshTimer = null;
 
@@ -6233,7 +6246,7 @@ function _wdrawAutoRefreshTick() {
       var parsed = parseWithdrawalRows(rows);
       if (parsed && parsed.length > 0) {
         var localW = (STATE.withdrawals || []).filter(function(r){ return r.source === 'local'; });
-        STATE.withdrawals = parsed.concat(localW);
+        STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); } catch(e){}
         try { renderStocks();  } catch(e){}
         saveState();
