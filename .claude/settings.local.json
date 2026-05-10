@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(findstr /I \"code.gs\")",
+      "Bash(dir /B /A)",
+      "Bash(grep -c *)",
+      "Bash(grep -E *)",
+      "Bash(grep -n *)",
+      "Bash(git checkout *)"
     ]
   }
 }

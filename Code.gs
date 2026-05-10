@@ -38,22 +38,30 @@ var SHEET_ID = '18VqdFB_anOyzMA05DXtc7I0YKE84AnEELF35gnIDsFU';
 var ADMIN_PIN = '7777';
 var USER_PIN  = '1234';
 
-var ITEMCODE_TAB     = 'ITEMCODE';
-var WITHDRAWAL_TAB   = 'WITHDRAWAL';
-var RECEIVED_TAB     = 'RECEIVED';
-var BEGINNING_TAB    = 'BEGINNING';
-var SALESORDER_TAB   = 'SALESORDER';
-var SPLIT_TAB        = 'SPLIT';
-var SERVED_TAB       = 'SERVED';
-var PARTIALROLLS_TAB = 'PARTIALROLLS';
+var ITEMCODE_TAB        = 'ITEMCODE';
+var WITHDRAWAL_TAB      = 'WITHDRAWAL';
+var RECEIVED_TAB        = 'RECEIVED';
+var YARDSRECEIVED_TAB   = 'YARDSRECEIVED';
+var BEGINNING_TAB       = 'BEGINNING';
+var SALESORDER_TAB      = 'SALESORDER';
+var SPLIT_TAB           = 'SPLIT';
+var SERVED_TAB          = 'SERVED';
 // Each header now ends with Deleted + DeletedAt + DeletedBy for soft-delete audit.
-var WITHDRAWAL_HEADER   = ['Date','ItemCode','Description','Size','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
-var RECEIVED_HEADER     = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
-var BEGINNING_HEADER    = ['Date','ItemCode','Description','Size','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
-var SALESORDER_HEADER   = ['ID','Date','Time','OrderNo','Customer','Remarks','Items','Status','Deleted','DeletedAt','DeletedBy'];
-var SPLIT_HEADER        = ['Date','SplitID','ParentCode','ParentDesc','ParentSize','ParentQty','ChildCode','ChildDesc','ChildSize','ChildQty','Note'];
-var SERVED_HEADER       = ['Date','JobOrder','ItemID','Width','Length','Qty','Unit','Customer','Urgency','Status','Sales','ServedAt','RowKey','ID','Deleted','DeletedAt','DeletedBy'];
-var PARTIALROLLS_HEADER = ['ID','WithdrawalID','Date','Code','Width','WidthUnit','Length','LengthUnit','Qty','Ref','Size'];
+var WITHDRAWAL_HEADER    = ['Date','ItemCode','Description','Size','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var RECEIVED_HEADER      = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var YARDSRECEIVED_HEADER = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var PARTIALROLLS_TAB    = 'PARTIALROLLS';
+var PARTIALROLLS_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Ref','Size','WithdrawalID','ID','Deleted','DeletedAt','DeletedBy'];
+var PARTIALWITHDRAW_TAB    = 'PARTIALWITHDRAW';
+var PARTIALWITHDRAW_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Ref','Size','Note','ID','Deleted','DeletedAt','DeletedBy'];
+var YARDSWITHDRAWN_TAB    = 'YARDSWITHDRAWN';
+var YARDSWITHDRAWN_HEADER = ['Date','CoreNo','ItemID','Yards','Ref','Note','ID','Deleted','DeletedAt','DeletedBy'];
+var DISPOSAL_TAB    = 'DISPOSAL';
+var DISPOSAL_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var BEGINNING_HEADER  = ['Date','ItemCode','Description','Size','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
+var SALESORDER_HEADER = ['ID','Date','Time','OrderNo','Customer','Remarks','Items','Status','Deleted','DeletedAt','DeletedBy'];
+var SPLIT_HEADER      = ['Date','SplitID','ParentCode','ParentDesc','ParentSize','ParentQty','ChildCode','ChildDesc','ChildSize','ChildQty','Note'];
+var SERVED_HEADER     = ['Date','JobOrder','ItemID','Width','Length','Qty','Unit','Customer','Urgency','Status','Sales','ServedAt','RowKey','ID','Deleted','DeletedAt','DeletedBy'];
 
 // Column indexes (1-based) for the soft-delete columns. Computed from header above.
 function _delColIdx(header) { return header.indexOf('Deleted') + 1; }
@@ -96,14 +104,13 @@ function doGet(e) {
     }
   }
 
-  if (action === 'read_itemcode')      return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
-  if (action === 'read_withdrawals')   return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
-  if (action === 'read_received')      return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
-  if (action === 'read_beginning')     return _json({ok:true, rows: _getBeginningSheet().getDataRange().getValues()});
-  if (action === 'read_salesorders')   return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
-  if (action === 'read_splits')        return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
-  if (action === 'read_served')        return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
-  if (action === 'read_partialrolls')  return _json({ok:true, rows: _getPartialRollsSheet().getDataRange().getValues()});
+  if (action === 'read_itemcode')    return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
+  if (action === 'read_withdrawals') return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
+  if (action === 'read_received')    return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
+  if (action === 'read_beginning')   return _json({ok:true, rows: _getBeginningSheet().getDataRange().getValues()});
+  if (action === 'read_salesorders') return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
+  if (action === 'read_splits')      return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
+  if (action === 'read_served')      return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
 
   if (e.parameter.payload) {
     var body;
@@ -184,14 +191,23 @@ function _handleWrite(body) {
 
   if (action === 'delete_withdrawal') {
     // HARD delete — permanently removes the row from the WITHDRAWAL sheet.
-    // Soft-delete was unreliable when the sheet's header row was missing the
-    // Deleted/DeletedAt/DeletedBy columns: the parser couldn't filter out
-    // flagged rows, so deleted items resurfaced on Sync Now.
-    var did = body.id || '';
-    if (!did) return _json({ok:false, error:'Missing id for delete_withdrawal'});
+    // Supports two modes:
+    //   1. id-based (preferred): finds the row by scanning column I for the ID.
+    //   2. sheetRow-based (legacy fallback): used when the row has no ID in
+    //      column I (pre-dates the ID column). The frontend sends the 1-based
+    //      row number it read from the sheet so we can delete it directly.
     var sh = _getWithdrawalSheet();
-    var rowIdx = _findRowById(sh, 9, did);
-    if (rowIdx === -1) return _json({ok:false, error:'Withdrawal not found: '+did});
+    var rowIdx = -1;
+    var did = String(body.id || '').trim();
+    if (did) {
+      rowIdx = _findRowById(sh, 9, did);
+      if (rowIdx === -1) return _json({ok:false, error:'Withdrawal not found: '+did});
+    } else {
+      var sr = parseInt(body.sheetRow, 10);
+      if (!sr || sr < 2) return _json({ok:false, error:'Missing id or valid sheetRow for delete_withdrawal'});
+      if (sr > sh.getLastRow()) return _json({ok:false, error:'sheetRow '+sr+' out of range'});
+      rowIdx = sr;
+    }
     sh.deleteRow(rowIdx);
     return _json({ok:true, hard:true, row:rowIdx});
   }
@@ -206,6 +222,142 @@ function _handleWrite(body) {
     if (rexisting === -1) rsh.appendRow(rrow);
     else rsh.getRange(rexisting, 1, 1, rrow.length).setValues([rrow]);
     return _json({ok:true, id:rid});
+  }
+
+  if (action === 'save_yardsreceived') {
+    var yr = body.record || {};
+    if (!yr.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var yrid = yr.id || _genId('yrc');
+    var yrsh = _getYardsReceivedSheet();
+    var yrexisting = _findRowById(yrsh, 9, yrid);
+    var yrrow = [yr.date||'', String(yr.itemCode), yr.desc||'', yr.size||'', Number(yr.qty)||0, yr.mrrNo||'', yr.supplier||'', yr.remarks||'', yrid, false, '', ''];
+    if (yrexisting === -1) yrsh.appendRow(yrrow);
+    else yrsh.getRange(yrexisting, 1, 1, yrrow.length).setValues([yrrow]);
+    return _json({ok:true, id:yrid});
+  }
+
+  if (action === 'delete_yardsreceived') {
+    // HARD delete — permanently removes the row from the YARDSRECEIVED sheet.
+    // Tries id first (column I), then falls back to mrrNo/coreNo (column F/6)
+    // for rolls that were added before the ID column existed.
+    var yrsh2 = _getYardsReceivedSheet();
+    var yrdRowIdx = -1;
+    var yrdId = String(body.id || '').trim();
+    if (yrdId) {
+      yrdRowIdx = _findRowById(yrsh2, 9, yrdId);
+    }
+    if (yrdRowIdx === -1) {
+      // Fallback: find by mrrNo (Core No.) in column 6
+      var yrdMrr = String(body.mrrNo || '').trim();
+      if (yrdMrr) yrdRowIdx = _findRowByCode(yrsh2, 6, yrdMrr);
+    }
+    if (yrdRowIdx === -1) return _json({ok:false, error:'YARDSRECEIVED row not found for id='+yrdId+' mrrNo='+(body.mrrNo||'')});
+    yrsh2.deleteRow(yrdRowIdx);
+    return _json({ok:true, hard:true, row:yrdRowIdx});
+  }
+
+  if (action === 'save_partialroll') {
+    var pr = body.record || {};
+    if (!pr.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var prid = pr.id || _genId('pr');
+    var prsh = _getPartialRollsSheet();
+    var prexisting = _findRowById(prsh, 11, prid);
+    var prrow = [
+      pr.date||'', String(pr.itemCode),
+      pr.width||'', pr.widthUnit||'',
+      pr.length||'', pr.lengthUnit||'',
+      Number(pr.qty)||1, pr.ref||'', pr.size||'',
+      pr.withdrawalId||'', prid, false, '', ''
+    ];
+    if (prexisting === -1) prsh.appendRow(prrow);
+    else prsh.getRange(prexisting, 1, 1, prrow.length).setValues([prrow]);
+    return _json({ok:true, id:prid});
+  }
+
+  if (action === 'delete_partialroll') {
+    // HARD delete — id lives in column 11 (PARTIALROLLS_HEADER position).
+    var dprid = String(body.id || '').trim();
+    if (!dprid) return _json({ok:false, error:'Missing id for delete_partialroll'});
+    var dprsh = _getPartialRollsSheet();
+    var dprIdx = _findRowById(dprsh, 11, dprid);
+    if (dprIdx === -1) return _json({ok:true, removed:false});
+    dprsh.deleteRow(dprIdx);
+    return _json({ok:true, hard:true, row:dprIdx});
+  }
+
+  // ===== PARTIALWITHDRAW =====
+  if (action === 'save_partialwithdraw') {
+    var pw = body.record || {};
+    if (!pw.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var pwid = pw.id || _genId('prwd');
+    var pwsh = _getPartialWithdrawSheet();
+    var pwexisting = _findRowById(pwsh, 11, pwid);
+    var pwrow = [
+      pw.date||'', String(pw.itemCode),
+      pw.width||'', pw.widthUnit||'',
+      pw.length||'', pw.lengthUnit||'',
+      Number(pw.qty)||0, pw.ref||'', pw.size||'',
+      _safeText(pw.note||''), pwid, false, '', ''
+    ];
+    if (pwexisting === -1) pwsh.appendRow(pwrow);
+    else pwsh.getRange(pwexisting, 1, 1, pwrow.length).setValues([pwrow]);
+    return _json({ok:true, id:pwid});
+  }
+
+  if (action === 'delete_partialwithdraw') {
+    var dpwid = String(body.id || '').trim();
+    if (!dpwid) return _json({ok:false, error:'Missing id for delete_partialwithdraw'});
+    var dpwsh = _getPartialWithdrawSheet();
+    var dpwIdx = _findRowById(dpwsh, 11, dpwid);
+    if (dpwIdx === -1) return _json({ok:true, removed:false});
+    dpwsh.deleteRow(dpwIdx);
+    return _json({ok:true, hard:true, row:dpwIdx});
+  }
+
+  // ===== YARDSWITHDRAWN =====
+  if (action === 'save_yardswithdrawn') {
+    var yw = body.record || {};
+    if (!yw.coreNo) return _json({ok:false, error:'Missing coreNo'});
+    var ywid = yw.id || _genId('tmywd');
+    var ywsh = _getYardsWithdrawnSheet();
+    var ywexisting = _findRowById(ywsh, 7, ywid);
+    var ywrow = [
+      yw.date||'', String(yw.coreNo), String(yw.itemId||''),
+      Number(yw.yards)||0, yw.ref||'', _safeText(yw.note||''),
+      ywid, false, '', ''
+    ];
+    if (ywexisting === -1) ywsh.appendRow(ywrow);
+    else ywsh.getRange(ywexisting, 1, 1, ywrow.length).setValues([ywrow]);
+    return _json({ok:true, id:ywid});
+  }
+
+  if (action === 'delete_yardswithdrawn') {
+    var dywid = String(body.id || '').trim();
+    if (!dywid) return _json({ok:false, error:'Missing id for delete_yardswithdrawn'});
+    var dywsh = _getYardsWithdrawnSheet();
+    var dywIdx = _findRowById(dywsh, 7, dywid);
+    if (dywIdx === -1) return _json({ok:true, removed:false});
+    dywsh.deleteRow(dywIdx);
+    return _json({ok:true, hard:true, row:dywIdx});
+  }
+
+  // ===== DISPOSAL =====
+  if (action === 'save_disposal') {
+    var dp = body.record || {};
+    if (!dp.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var dpid = dp.id || _genId('dsp');
+    var dpsh = _getDisposalSheet();
+    var dpexisting = _findRowById(dpsh, 9, dpid);
+    var dprow = [
+      dp.date||'', String(dp.itemCode),
+      dp.width||'', dp.widthUnit||'',
+      dp.length||'', dp.lengthUnit||'',
+      Number(dp.qty)||0, _safeText(dp.remarks||''),
+      dpid, false, '', ''
+    ];
+    if (dpexisting === -1) dpsh.appendRow(dprow);
+    else dpsh.getRange(dpexisting, 1, 1, dprow.length).setValues([dprow]);
+    return _json({ok:true, id:dpid});
   }
 
   if (action === 'delete_received') {
@@ -395,61 +547,6 @@ function _handleWrite(body) {
     return _json({ok:true, soft:true});
   }
 
-  // ===== PARTIALROLLS =====
-  if (action === 'save_partialroll') {
-    var pr = body.record || {};
-    if (!pr.id) return _json({ok:false, error:'Missing id for save_partialroll'});
-    var psh = _getPartialRollsSheet();
-    var pexisting = _findRowById(psh, 1, pr.id);
-    var prow = [
-      String(pr.id),
-      String(pr.withdrawalId || ''),
-      pr.date || '',
-      String(pr.code || ''),
-      pr.width || '',
-      pr.widthUnit || '',
-      pr.length || '',
-      pr.lengthUnit || '',
-      Number(pr.qty)||0,
-      pr.ref || '',
-      pr.size || ''
-    ];
-    if (pexisting === -1) psh.appendRow(prow);
-    else psh.getRange(pexisting, 1, 1, prow.length).setValues([prow]);
-    return _json({ok:true, id: pr.id});
-  }
-
-  if (action === 'delete_partialroll') {
-    // HARD delete — permanently removes the row. Mirrors delete_withdrawal.
-    var pid = body.id || '';
-    if (!pid) return _json({ok:false, error:'Missing id for delete_partialroll'});
-    var psh2 = _getPartialRollsSheet();
-    var pIdx = _findRowById(psh2, 1, pid);
-    if (pIdx === -1) return _json({ok:true, removed:false});
-    psh2.deleteRow(pIdx);
-    return _json({ok:true, hard:true, row:pIdx});
-  }
-
-  if (action === 'delete_partialroll_by_withdrawal') {
-    // Removes ALL partial roll rows tied to a withdrawal id (col B = WithdrawalID).
-    // Used when a withdrawal itself is deleted.
-    var wid = String(body.withdrawalId || '').trim();
-    if (!wid) return _json({ok:false, error:'Missing withdrawalId'});
-    var psh3 = _getPartialRollsSheet();
-    var lastRow = psh3.getLastRow();
-    if (lastRow < 2) return _json({ok:true, removed:0});
-    var widCol = psh3.getRange(2, 2, lastRow - 1, 1).getValues();
-    var removed = 0;
-    // Iterate bottom-up so row indices stay stable as we delete.
-    for (var ri = widCol.length - 1; ri >= 0; ri--) {
-      if (String(widCol[ri][0]).trim() === wid) {
-        psh3.deleteRow(ri + 2);
-        removed++;
-      }
-    }
-    return _json({ok:true, removed:removed});
-  }
-
   return _json({ok:false, error:'Unknown action: '+action});
 }
 
@@ -477,6 +574,41 @@ function _getReceivedSheet() {
   var sh = ss.getSheetByName(RECEIVED_TAB);
   if (!sh) { sh = ss.insertSheet(RECEIVED_TAB); sh.appendRow(RECEIVED_HEADER); return sh; }
   if (sh.getLastRow() === 0) sh.appendRow(RECEIVED_HEADER);
+  return sh;
+}
+function _getYardsReceivedSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(YARDSRECEIVED_TAB);
+  if (!sh) { sh = ss.insertSheet(YARDSRECEIVED_TAB); sh.appendRow(YARDSRECEIVED_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(YARDSRECEIVED_HEADER);
+  return sh;
+}
+function _getPartialRollsSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(PARTIALROLLS_TAB);
+  if (!sh) { sh = ss.insertSheet(PARTIALROLLS_TAB); sh.appendRow(PARTIALROLLS_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(PARTIALROLLS_HEADER);
+  return sh;
+}
+function _getPartialWithdrawSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(PARTIALWITHDRAW_TAB);
+  if (!sh) { sh = ss.insertSheet(PARTIALWITHDRAW_TAB); sh.appendRow(PARTIALWITHDRAW_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(PARTIALWITHDRAW_HEADER);
+  return sh;
+}
+function _getDisposalSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(DISPOSAL_TAB);
+  if (!sh) { sh = ss.insertSheet(DISPOSAL_TAB); sh.appendRow(DISPOSAL_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(DISPOSAL_HEADER);
+  return sh;
+}
+function _getYardsWithdrawnSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(YARDSWITHDRAWN_TAB);
+  if (!sh) { sh = ss.insertSheet(YARDSWITHDRAWN_TAB); sh.appendRow(YARDSWITHDRAWN_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(YARDSWITHDRAWN_HEADER);
   return sh;
 }
 function _getBeginningSheet() {
@@ -507,12 +639,11 @@ function _getServedSheet() {
   if (sh.getLastRow() === 0) sh.appendRow(SERVED_HEADER);
   return sh;
 }
-function _getPartialRollsSheet() {
-  var ss = _openSS();
-  var sh = ss.getSheetByName(PARTIALROLLS_TAB);
-  if (!sh) { sh = ss.insertSheet(PARTIALROLLS_TAB); sh.appendRow(PARTIALROLLS_HEADER); return sh; }
-  if (sh.getLastRow() === 0) sh.appendRow(PARTIALROLLS_HEADER);
-  return sh;
-}
 
 function _txt(s){ return ContentService.createTextOutput(s).setMimeType(ContentService.MimeType.TEXT); }
+
+function _json(obj){
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
