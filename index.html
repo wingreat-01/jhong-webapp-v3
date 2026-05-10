@@ -650,7 +650,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">7/8</span>
+  <span class="sync-progress" id="syncIndicatorProgress"></span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1950,6 +1950,7 @@ function syncNow(opts) {
   var indProg = document.getElementById('syncIndicatorProgress');
   if (ind) ind.className = 'sync-indicator show';
   if (indTxt) indTxt.textContent = 'Syncing...';
+  if (indProg) indProg.textContent = '';   // clear stale value from previous run
 
   var failed = [];
   var done = 0, total = 0;
@@ -2142,9 +2143,17 @@ function syncNow(opts) {
   // stays in sync with the backend across all devices.
   total++;
   jobs.push(new Promise(function(resolve){
-    if (!STATE.config.proxyUrl) { bumpProg(); resolve(); return; }
+    var _settled = false;
+    function _finish() { if (_settled) return; _settled = true; bumpProg(); resolve(); }
+    // Hard 12-second Promise-level timeout — guards against AbortController not
+    // being supported or the fetch silently hanging (GAS cold start, quota, etc.).
+    var _guard = setTimeout(function(){
+      if (!_settled) { console.warn('read_yardsreceived: timed out'); failed.push('yardsreceived'); _finish(); }
+    }, 12000);
+    if (!STATE.config.proxyUrl) { clearTimeout(_guard); _finish(); return; }
     fetchFromAppsScript('read_yardsreceived',
       function(rows){
+        clearTimeout(_guard);
         var parsed = parseYardsReceivedRows(rows || []);
         // Replace from backend only when we got parseable rolls, OR when the
         // sheet is genuinely empty (header-only). If the backend returned data
@@ -2164,14 +2173,13 @@ function syncNow(opts) {
             'rows but parser yielded 0 — keeping local state. Check YARDSRECEIVED sheet headers.');
         }
         try { render3MYards(); } catch(e){}
-        bumpProg();
-        resolve();
+        _finish();
       },
       function(err){
+        clearTimeout(_guard);
         console.warn('read_yardsreceived:', err);
         failed.push('yardsreceived');
-        bumpProg();
-        resolve();
+        _finish();
       }
     );
   }));
