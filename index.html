@@ -1846,7 +1846,9 @@ function loadState() {
     var s = localStorage.getItem('jhong_state');
     if (s) {
       var p = JSON.parse(s);
-      STATE.items = p.items || [];
+      // STATE.items intentionally NOT restored from localStorage.
+      // Items are always fetched fresh from the ITEMCODE sheet on every syncNow()
+      // so that edits to the sheet (e.g. DST values in column A) appear immediately.
       STATE.withdrawals = p.withdrawals || [];
       STATE.received = p.received || [];
       STATE.beginning = p.beginning || {};
@@ -1879,7 +1881,8 @@ function loadState() {
 function saveState() {
   try {
     localStorage.setItem('jhong_state', JSON.stringify({
-      items: STATE.items,
+      // items intentionally excluded — always fetched fresh from ITEMCODE sheet.
+      // Persisting them caused stale autocomplete suggestions after sheet edits.
       withdrawals: STATE.withdrawals,
       received: STATE.received,
       beginning: STATE.beginning,
