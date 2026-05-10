@@ -104,13 +104,15 @@ function doGet(e) {
     }
   }
 
-  if (action === 'read_itemcode')    return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
-  if (action === 'read_withdrawals') return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
-  if (action === 'read_received')    return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
-  if (action === 'read_beginning')   return _json({ok:true, rows: _getBeginningSheet().getDataRange().getValues()});
-  if (action === 'read_salesorders') return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
-  if (action === 'read_splits')      return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
-  if (action === 'read_served')      return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
+  if (action === 'read_itemcode')      return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
+  if (action === 'read_withdrawals')   return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
+  if (action === 'read_received')      return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
+  if (action === 'read_yardsreceived') return _json({ok:true, rows: _getYardsReceivedSheet().getDataRange().getValues()});
+  if (action === 'read_beginning')     return _json({ok:true, rows: _getBeginningSheet().getDataRange().getValues()});
+  if (action === 'read_salesorders')   return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
+  if (action === 'read_splits')        return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
+  if (action === 'read_served')        return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
+  if (action === 'read_partialrolls')  return _json({ok:true, rows: _getPartialRollsSheet().getDataRange().getValues()});
 
   if (e.parameter.payload) {
     var body;

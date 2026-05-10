@@ -168,15 +168,15 @@ tbody td{padding:9px 12px;color:#263238;vertical-align:middle}
 .ac-qty{font-size:11px;color:#33691E;font-weight:700;flex-shrink:0}
 
 /* Enlarged Withdraw-tab item-code autocomplete dropdown (#acList) for better readability */
-#acList{max-height:460px;min-width:640px;border-radius:10px;border-width:2px;box-shadow:0 12px 32px rgba(46,125,50,0.22)}
-#acList .ac-row{padding:14px 18px;gap:14px}
-#acList .ac-code{font-size:16px;min-width:200px}
-#acList .ac-desc{font-size:16px}
-#acList .ac-qty{font-size:14px}
-#acList .ac-row.nrsr{padding:16px 18px;gap:8px}
-#acList .ac-row.nrsr .ac-code{font-size:17px}
-#acList .ac-row.nrsr .ac-desc{font-size:16px;padding:9px 14px;line-height:1.4}
-#acList .ac-row.nrsr .ac-desc:before{font-size:11px}
+#acList,#tmyAcList{max-height:460px;min-width:640px;border-radius:10px;border-width:2px;box-shadow:0 12px 32px rgba(46,125,50,0.22)}
+#acList .ac-row,#tmyAcList .ac-row{padding:14px 18px;gap:14px}
+#acList .ac-code,#tmyAcList .ac-code{font-size:16px;min-width:200px}
+#acList .ac-desc,#tmyAcList .ac-desc{font-size:16px}
+#acList .ac-qty,#tmyAcList .ac-qty{font-size:14px}
+#acList .ac-row.nrsr,#tmyAcList .ac-row.nrsr{padding:16px 18px;gap:8px}
+#acList .ac-row.nrsr .ac-code,#tmyAcList .ac-row.nrsr .ac-code{font-size:17px}
+#acList .ac-row.nrsr .ac-desc,#tmyAcList .ac-row.nrsr .ac-desc{font-size:16px;padding:9px 14px;line-height:1.4}
+#acList .ac-row.nrsr .ac-desc:before,#tmyAcList .ac-row.nrsr .ac-desc:before{font-size:11px}
 
 /* Submit-status pill (Withdraw tab) — replaces post-submit toast */
 .submit-pill{display:inline-flex;align-items:center;justify-content:center;padding:7px 10px;border-radius:14px;border:1px solid transparent;background:#ECEFF1;color:#607D8B;transition:background 0.25s,color 0.25s,border-color 0.25s;visibility:hidden;align-self:center}
@@ -3881,42 +3881,88 @@ function clear3MYardsForm() {
   if (c) c.focus();
 }
 
-// ---------- Item ID autocomplete (3M Yards form) ----------
+// ---------- Item ID autocomplete (3M Yards form — mirrors Withdraw tab) ----------
 var _tmyAcIndex = -1;
+
 function onTmyItemInput() {
   var v = document.getElementById('tmyItemId').value.trim();
+  _tmyFillItemDetails(v);
   showTmyItemAC(v);
-  // auto-fill desc/width if exact match
+}
+
+function _tmyFillItemDetails(v) {
+  if (!v) { document.getElementById('tmyItemDesc').value = ''; return; }
   var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
   if (match) {
     document.getElementById('tmyItemDesc').value = match.desc || '';
     if (!document.getElementById('tmyWidth').value) document.getElementById('tmyWidth').value = match.size || '';
+  } else {
+    document.getElementById('tmyItemDesc').value = '';
   }
 }
+
+function _tmyAcPreviewDesc(code) {
+  if (!code) return;
+  var item = (STATE.items || []).find(function(it){ return it.code.toLowerCase() === String(code).toLowerCase(); });
+  if (!item) return;
+  var d = document.getElementById('tmyItemDesc');
+  var w = document.getElementById('tmyWidth');
+  if (d) d.value = item.desc || '';
+  if (w && !w.value) w.value = item.size || '';
+}
+
 function showTmyItemAC(v) {
   var list = document.getElementById('tmyAcList');
   if (!list) return;
-  var q = (v||'').toLowerCase();
-  var items = STATE.items || [];
-  var matches = !q ? items.slice(0, 30) : items.filter(function(it){
-    return (it.code||'').toLowerCase().indexOf(q) !== -1
-        || (it.desc||'').toLowerCase().indexOf(q) !== -1;
-  }).slice(0, 30);
-  if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
-  var html = matches.map(function(it, i){
-    return '<div class="ac-item'+(i===_tmyAcIndex?' active':'')+'" onmousedown="event.preventDefault()" onclick="pickTmyItem(\''+escAttr(it.code)+'\')">'
-      + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
-      + ' <span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
-      + '</div>';
-  }).join('');
+  var lv = (v||'').trim().toLowerCase();
+  if (!lv) { list.classList.remove('show'); list.innerHTML = ''; return; }
+  var matches = (STATE.items || []).filter(function(it){
+    return (it.code||'').toLowerCase().indexOf(lv) !== -1
+        || (it.desc||'').toLowerCase().indexOf(lv) !== -1;
+  });
+  matches.sort(function(a, b){
+    var an = _isNrSrCode(a.code) ? 0 : 1;
+    var bn = _isNrSrCode(b.code) ? 0 : 1;
+    return an - bn;
+  });
+  matches = matches.slice(0, 12);
+  if (!matches.length) { list.classList.remove('show'); list.innerHTML = ''; return; }
+  _tmyAcIndex = -1;
+  var html = '';
+  matches.forEach(function(it, i){
+    var avail = availableFor(it);
+    var availColor = avail <= 0 ? '#C62828' : (avail < 5 ? '#E65100' : '#2E7D32');
+    var isNrSr = _isNrSrCode(it.code);
+    var rowCls = 'ac-row' + (isNrSr ? ' nrsr' : '');
+    var descTxt = it.desc && it.desc.trim() ? it.desc : (isNrSr ? '(no description in ITEMCODE)' : '');
+    if (isNrSr) {
+      html += '<div class="'+rowCls+'" onmousedown="event.preventDefault()" '
+           +  'onmouseenter="_tmyAcPreviewDesc(\''+escAttr(it.code)+'\')" '
+           +  'onclick="pickTmyItem(\''+escAttr(it.code)+'\')" data-idx="'+i+'" data-code="'+escAttr(it.code)+'">'
+           +    '<div class="ac-top"><span class="ac-code">'+escapeHtml(it.code)+'</span>'
+           +    '<span class="ac-qty" style="color:'+availColor+'">avail: '+avail+'</span></div>'
+           +    '<span class="ac-desc">'+escapeHtml(descTxt)+'</span>'
+           +  '</div>';
+    } else {
+      html += '<div class="'+rowCls+'" onmousedown="event.preventDefault()" '
+           +  'onmouseenter="_tmyAcPreviewDesc(\''+escAttr(it.code)+'\')" '
+           +  'onclick="pickTmyItem(\''+escAttr(it.code)+'\')" data-idx="'+i+'" data-code="'+escAttr(it.code)+'">'
+           +  '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
+           +  '<span class="ac-desc">'+escapeHtml(descTxt)+'</span>'
+           +  '<span class="ac-qty" style="color:'+availColor+'">avail: '+avail+'</span>'
+           +  '</div>';
+    }
+  });
   list.innerHTML = html;
-  list.style.display = 'block';
+  list.classList.add('show');
 }
+
 function hideTmyItemAC() {
   var list = document.getElementById('tmyAcList');
-  if (list) { list.style.display = 'none'; list.innerHTML = ''; }
+  if (list) { list.classList.remove('show'); list.innerHTML = ''; }
   _tmyAcIndex = -1;
 }
+
 function pickTmyItem(code) {
   document.getElementById('tmyItemId').value = code;
   var match = (STATE.items || []).find(function(it){ return it.code === code; });
@@ -3927,14 +3973,29 @@ function pickTmyItem(code) {
   hideTmyItemAC();
   document.getElementById('tmyQtyYards').focus();
 }
+
+function _tmyRefreshAcActive(rows) {
+  for (var i = 0; i < rows.length; i++) rows[i].classList.toggle('active', i === _tmyAcIndex);
+  if (_tmyAcIndex >= 0 && rows[_tmyAcIndex]) {
+    rows[_tmyAcIndex].scrollIntoView({block:'nearest'});
+    var code = rows[_tmyAcIndex].getAttribute('data-code');
+    if (code) _tmyAcPreviewDesc(code);
+  }
+}
+
 function onTmyItemKey(e) {
   var list = document.getElementById('tmyAcList');
-  if (!list || list.style.display === 'none') return;
-  var items = list.querySelectorAll('.ac-item');
-  if (e.key === 'ArrowDown') { e.preventDefault(); _tmyAcIndex = Math.min(_tmyAcIndex+1, items.length-1); showTmyItemAC(document.getElementById('tmyItemId').value.trim()); }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); _tmyAcIndex = Math.max(_tmyAcIndex-1, -1); showTmyItemAC(document.getElementById('tmyItemId').value.trim()); }
+  var rows = list ? list.querySelectorAll('.ac-row') : [];
+  if (!rows.length) {
+    if (e.key === 'Enter') { e.preventDefault(); _tmyFillItemDetails(document.getElementById('tmyItemId').value.trim()); }
+    return;
+  }
+  if (e.key === 'ArrowDown') { e.preventDefault(); _tmyAcIndex = Math.min(rows.length-1, _tmyAcIndex+1); _tmyRefreshAcActive(rows); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _tmyAcIndex = Math.max(0, _tmyAcIndex-1); _tmyRefreshAcActive(rows); }
   else if (e.key === 'Enter') {
-    if (_tmyAcIndex >= 0 && items[_tmyAcIndex]) { e.preventDefault(); items[_tmyAcIndex].click(); }
+    e.preventDefault();
+    if (_tmyAcIndex >= 0 && rows[_tmyAcIndex]) rows[_tmyAcIndex].click();
+    else _tmyFillItemDetails(document.getElementById('tmyItemId').value.trim());
   } else if (e.key === 'Escape') {
     hideTmyItemAC();
   }
