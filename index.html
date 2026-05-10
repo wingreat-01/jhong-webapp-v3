@@ -3853,7 +3853,7 @@ function edit3MYardsRoll(coreNo) {
   document.getElementById('tmyRemarks').value   = r.remarks || '';
   var btn = document.getElementById('tmySubmitBtn');
   if (btn) { btn.textContent = '✓ Update Roll'; btn.style.background = '#E65100'; }
-  document.getElementById('tmyCoreNo').scrollIntoView({behavior:'smooth', block:'center'});
+  document.getElementById('tmyCoreNo').scrollIntoView({behavior:'smooth', block:'nearest'});
   showToast('Editing roll — click Update to save.', 'success');
 }
 
