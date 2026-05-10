@@ -2146,14 +2146,23 @@ function syncNow(opts) {
     fetchFromAppsScript('read_yardsreceived',
       function(rows){
         var parsed = parseYardsReceivedRows(rows || []);
-        // Always replace from backend — even an empty result is authoritative.
-        // Merge: preserve withdrawn totals from existing local rolls.
-        var existing = STATE.threeMYards || [];
-        STATE.threeMYards = parsed.map(function(r){
-          var loc = existing.find(function(e){ return (e.coreNo||'').toLowerCase() === (r.coreNo||'').toLowerCase(); });
-          r.withdrawn = loc ? (parseFloat(loc.withdrawn)||0) : 0;
-          return r;
-        });
+        // Replace from backend only when we got parseable rolls, OR when the
+        // sheet is genuinely empty (header-only). If the backend returned data
+        // rows but parsing produced nothing (e.g. column-name mismatch), keep
+        // the existing local state so data is not silently wiped.
+        var backendHasDataRows = (rows || []).length > 1;
+        if (parsed.length > 0 || !backendHasDataRows) {
+          var existing = STATE.threeMYards || [];
+          STATE.threeMYards = parsed.map(function(r){
+            var loc = existing.find(function(e){ return (e.coreNo||'').toLowerCase() === (r.coreNo||'').toLowerCase(); });
+            r.withdrawn = loc ? (parseFloat(loc.withdrawn)||0) : 0;
+            r.remarks   = r.remarks || (loc ? (loc.remarks||'') : '');
+            return r;
+          });
+        } else {
+          console.warn('read_yardsreceived: backend returned', (rows||[]).length-1,
+            'rows but parser yielded 0 — keeping local state. Check YARDSRECEIVED sheet headers.');
+        }
         try { render3MYards(); } catch(e){}
         bumpProg();
         resolve();
@@ -2349,25 +2358,30 @@ function parseYardsReceivedRows(rows) {
       iSize = col('size'),     iQty  = col('qty'),      iMrr  = col('mrr'),
       iSup  = col('supplier'), iRem  = col('remarks'),  iId   = col('id'),
       iDel  = col('deleted');
-  // Fallback to canonical column positions if header is missing id/deleted
-  if (iId  < 0) iId  = 8;
-  if (iDel < 0) iDel = 9;
+  // Fallback to canonical column positions matching YARDSRECEIVED_HEADER:
+  // [Date, ItemCode, Description, Size, Qty, MRR, Supplier, Remarks, ID, Deleted, ...]
+  if (iCode < 0) iCode = 1;
+  if (iMrr  < 0) iMrr  = 5;
+  if (iRem  < 0) iRem  = 7;
+  if (iId   < 0) iId   = 8;
+  if (iDel  < 0) iDel  = 9;
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
-    if (iDel >= 0 && _isDeletedFlag(r[iDel])) continue;
-    var code = String(iCode >= 0 ? r[iCode] : '').trim();
+    if (_isDeletedFlag(r[iDel])) continue;
+    var code = String(r[iCode]||'').trim();
     if (!code) continue;
-    var coreNo = iMrr >= 0 ? String(r[iMrr]||'').trim() : '';
+    var coreNo = String(r[iMrr]||'').trim();
     if (!coreNo) coreNo = 'ROLL-'+(i); // fallback if MRR blank
     out.push({
-      coreNo:   coreNo,
-      itemId:   code,
-      itemDesc: iDesc >= 0 ? String(r[iDesc]||'').trim() : '',
-      width:    iSize >= 0 ? String(r[iSize]||'').trim() : '',
-      qtyYards: iQty  >= 0 ? (parseFloat(r[iQty])||0)   : 0,
-      withdrawn: 0,    // restored from local state in the merge step
-      _backendId: iId >= 0 ? String(r[iId]||'').trim() : ''
+      coreNo:     coreNo,
+      itemId:     code,
+      itemDesc:   iDesc >= 0 ? String(r[iDesc]||'').trim() : '',
+      width:      iSize >= 0 ? String(r[iSize]||'').trim() : '',
+      qtyYards:   iQty  >= 0 ? (parseFloat(r[iQty])||0)   : 0,
+      withdrawn:  0,    // restored from local state in the merge step
+      remarks:    String(r[iRem]||'').trim(),
+      _backendId: String(r[iId]||'').trim()
     });
   }
   return out;
