@@ -2308,41 +2308,66 @@ function parseItemcodeRows(rows) {
 function parseWithdrawalRows(rows) {
   if (!rows || rows.length < 2) return [];
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
-  function col(name){ return header.indexOf(name); }
-  var iDate = col('date'), iCode = col('itemcode'), iDesc = col('description'),
-      iSize = col('size'), iQty = col('qty'),
-      iWhdl = col('withdrawalno'), iCust = col('customer'),
-      iRem = col('remarks'), iId = col('id'), iDel = col('deleted');
-  // BUGFIX: if header row is missing 'id' / 'deleted' (sheet pre-dates those
-  // columns), fall back to the canonical positions so we still see real IDs
-  // and soft-delete flags in column I/J.
-  if (iId  < 0) iId  = 8; // column I
-  if (iDel < 0) iDel = 9; // column J
+  function col1(names) {
+    for (var i = 0; i < names.length; i++) {
+      var idx = header.indexOf(names[i]);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+  var iDate = col1(['date','orderdate']);
+  var iCode = col1(['itemcode','item code','item_code','code','itemid']);
+  var iDesc = col1(['description','desc','itemdesc','item description','item desc']);
+  var iSize = col1(['size','dimensions','width']);
+  var iQty  = col1(['qty','quantity','qty (yds)','qty(yds)','qty yards','amount']);
+  var iWhdl = col1(['withdrawalno','withdrawal no','withdrawal no.','wdno','wd no','wd no.','withdrawal number','dr no','drno','dr no.','withdrawal']);
+  var iCust = col1(['customer','customername','client','customer name']);
+  var iRem  = col1(['remarks','notes','note']);
+  var iId   = col1(['id']);
+  var iDel  = col1(['deleted']);
+  // Positional fallbacks — canonical WITHDRAWAL_HEADER order:
+  // [Date(0), ItemCode(1), Description(2), Size(3), Qty(4), WithdrawalNo(5), Customer(6), Remarks(7), ID(8), Deleted(9)]
+  if (iDate < 0) iDate = 0;
+  if (iCode < 0) iCode = 1;
+  if (iDesc < 0) iDesc = 2;
+  if (iSize < 0) iSize = 3;
+  if (iQty  < 0) iQty  = 4;
+  if (iWhdl < 0) iWhdl = 5;
+  if (iCust < 0) iCust = 6;
+  if (iRem  < 0) iRem  = 7;
+  if (iId   < 0) iId   = 8;
+  if (iDel  < 0) iDel  = 9;
+  console.log('[Withdrawal] header:', rows[0]);
+  console.log('[Withdrawal] col map: iDesc='+iDesc+' iQty='+iQty+' iWhdl='+iWhdl+' iId='+iId+' iDel='+iDel);
+  if (rows[1]) console.log('[Withdrawal] row1 raw:', rows[1]);
 
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
-    if (iDel >= 0 && _isDeletedFlag(r[iDel])) continue;   // skip soft-deleted
-    var code = String(iCode >= 0 ? r[iCode] : '').trim();
+    if (_isDeletedFlag(r[iDel])) continue;   // skip soft-deleted
+    var code = String(r[iCode]||'').trim();
     if (!code) continue;
-    var rawId = iId >= 0 ? String(r[iId]||'').trim() : '';
+    var rawId = String(r[iId]||'').trim();
     var legacyNoId = !rawId;
     // BUGFIX v3.27: legacy rows missing an ID would all collide on '' and a
     // single per-row delete would wipe every other ID-less row. Synthesize a
     // unique local id so per-row UI ops target one record only.
     if (legacyNoId) rawId = 'whd_legacy_r'+(i+1)+'_'+code.replace(/[^A-Za-z0-9]/g,'').slice(0,8);
+    // Guard: withdrawalNo must not look like an internal whd_* ID or ISO date
+    var whdlRaw = String(r[iWhdl]||'').trim();
+    if (/^whd_/.test(whdlRaw) || /^\d{4}-\d{2}-\d{2}/.test(whdlRaw)) whdlRaw = '';
     out.push({
       id:           rawId,
       _legacyNoId:  legacyNoId,
       _sheetRow:    legacyNoId ? (i+1) : null,
-      date:         iDate >= 0 ? formatRawDate(String(r[iDate]||'')) : '',
+      date:         formatRawDate(String(r[iDate]||'')),
       itemCode:     code,
-      desc:         iDesc >= 0 ? String(r[iDesc]||'').trim() : '',
-      size:         iSize >= 0 ? String(r[iSize]||'').trim() : '',
-      qty:          iQty  >= 0 ? (parseFloat(r[iQty])||0)    : 0,
-      withdrawalNo: iWhdl >= 0 ? String(r[iWhdl]||'').trim() : '',
-      customer:     iCust >= 0 ? String(r[iCust]||'').trim() : '',
-      remarks:      iRem  >= 0 ? String(r[iRem]||'').trim()  : '',
+      desc:         String(r[iDesc]||'').trim(),
+      size:         String(r[iSize]||'').trim(),
+      qty:          parseFloat(r[iQty]) || 0,
+      withdrawalNo: whdlRaw,
+      customer:     String(r[iCust]||'').trim(),
+      remarks:      String(r[iRem]||'').trim(),
       source: 'backend'
     });
   }
