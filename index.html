@@ -2626,6 +2626,8 @@ function deleteWithdrawal(id) {
     postToScript({action:'delete_withdrawal', id: id},
       function(){ /* success toast suppressed per user request */ },
       function(err){ showToast('Deleted locally — backend delete failed: '+err, 'error'); });
+    // Cascade to the backend PARTIALROLLS tab — wipe any rows tied to this withdrawal.
+    postToScript({action:'delete_partialroll_by_withdrawal', withdrawalId: id}, function(){}, function(){});
   } else {
     showToast('Deleted (local only)', 'success');
   }
@@ -5678,13 +5680,21 @@ function _updateExcessBtn() {
 function _savePartialRollRecord(withdrawalId, prRaw, date) {
   if (!STATE.partialRolls) STATE.partialRolls = [];
   // Remove any existing partial roll for this withdrawal (handles update case)
+  var hadPrior = (STATE.partialRolls || []).some(function(pr){ return pr.withdrawalId === withdrawalId; });
   STATE.partialRolls = STATE.partialRolls.filter(function(pr){ return pr.withdrawalId !== withdrawalId; });
-  if (!prRaw) return; // no excess material on this withdrawal
+  var prId = 'pr_' + withdrawalId;
+  if (!prRaw) {
+    // Excess Material was cleared on edit — delete the prior backend row too.
+    if (hadPrior) {
+      postToScript({action:'delete_partialroll', id: prId}, function(){}, function(){});
+    }
+    return;
+  }
   var ex;
   try { ex = JSON.parse(prRaw); } catch(e) { return; }
   if (!ex || !ex.code) return;
-  STATE.partialRolls.push({
-    id: 'pr_' + withdrawalId,
+  var rec = {
+    id: prId,
     date: date || '',
     withdrawalId: withdrawalId,
     code: ex.code,
@@ -5695,7 +5705,10 @@ function _savePartialRollRecord(withdrawalId, prRaw, date) {
     qty: ex.qty || 1,
     ref: ex.ref || '',
     size: ex.size || ''
-  });
+  };
+  STATE.partialRolls.push(rec);
+  // Mirror the record into the backend PARTIALROLLS tab so deletes can find it.
+  postToScript({action:'save_partialroll', record: rec}, function(){}, function(){});
 }
 
 // Delete a partial roll record by its id (ADMIN only).
@@ -5711,7 +5724,10 @@ function _deletePartialRoll(prId) {
   STATE.partialRolls = STATE.partialRolls.filter(function(p){ return p.id !== prId; });
   saveState();
   renderPartialRolls();
-  showToast('Partial roll record deleted.', 'success');
+  // Cascade the delete to the backend PARTIALROLLS tab.
+  postToScript({action:'delete_partialroll', id: prId},
+    function(){ showToast('Partial roll record deleted.', 'success'); },
+    function(err){ showToast('Deleted locally — backend delete failed: '+err, 'error'); });
 }
 
 function fetchCSV(url, onSuccess, onError, opts) {

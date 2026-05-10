@@ -38,20 +38,22 @@ var SHEET_ID = '18VqdFB_anOyzMA05DXtc7I0YKE84AnEELF35gnIDsFU';
 var ADMIN_PIN = '7777';
 var USER_PIN  = '1234';
 
-var ITEMCODE_TAB   = 'ITEMCODE';
-var WITHDRAWAL_TAB = 'WITHDRAWAL';
-var RECEIVED_TAB   = 'RECEIVED';
-var BEGINNING_TAB  = 'BEGINNING';
-var SALESORDER_TAB = 'SALESORDER';
-var SPLIT_TAB      = 'SPLIT';
-var SERVED_TAB     = 'SERVED';
+var ITEMCODE_TAB     = 'ITEMCODE';
+var WITHDRAWAL_TAB   = 'WITHDRAWAL';
+var RECEIVED_TAB     = 'RECEIVED';
+var BEGINNING_TAB    = 'BEGINNING';
+var SALESORDER_TAB   = 'SALESORDER';
+var SPLIT_TAB        = 'SPLIT';
+var SERVED_TAB       = 'SERVED';
+var PARTIALROLLS_TAB = 'PARTIALROLLS';
 // Each header now ends with Deleted + DeletedAt + DeletedBy for soft-delete audit.
-var WITHDRAWAL_HEADER = ['Date','ItemCode','Description','Size','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
-var RECEIVED_HEADER   = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
-var BEGINNING_HEADER  = ['Date','ItemCode','Description','Size','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
-var SALESORDER_HEADER = ['ID','Date','Time','OrderNo','Customer','Remarks','Items','Status','Deleted','DeletedAt','DeletedBy'];
-var SPLIT_HEADER      = ['Date','SplitID','ParentCode','ParentDesc','ParentSize','ParentQty','ChildCode','ChildDesc','ChildSize','ChildQty','Note'];
-var SERVED_HEADER     = ['Date','JobOrder','ItemID','Width','Length','Qty','Unit','Customer','Urgency','Status','Sales','ServedAt','RowKey','ID','Deleted','DeletedAt','DeletedBy'];
+var WITHDRAWAL_HEADER   = ['Date','ItemCode','Description','Size','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var RECEIVED_HEADER     = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var BEGINNING_HEADER    = ['Date','ItemCode','Description','Size','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
+var SALESORDER_HEADER   = ['ID','Date','Time','OrderNo','Customer','Remarks','Items','Status','Deleted','DeletedAt','DeletedBy'];
+var SPLIT_HEADER        = ['Date','SplitID','ParentCode','ParentDesc','ParentSize','ParentQty','ChildCode','ChildDesc','ChildSize','ChildQty','Note'];
+var SERVED_HEADER       = ['Date','JobOrder','ItemID','Width','Length','Qty','Unit','Customer','Urgency','Status','Sales','ServedAt','RowKey','ID','Deleted','DeletedAt','DeletedBy'];
+var PARTIALROLLS_HEADER = ['ID','WithdrawalID','Date','Code','Width','WidthUnit','Length','LengthUnit','Qty','Ref','Size'];
 
 // Column indexes (1-based) for the soft-delete columns. Computed from header above.
 function _delColIdx(header) { return header.indexOf('Deleted') + 1; }
@@ -94,13 +96,14 @@ function doGet(e) {
     }
   }
 
-  if (action === 'read_itemcode')    return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
-  if (action === 'read_withdrawals') return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
-  if (action === 'read_received')    return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
-  if (action === 'read_beginning')   return _json({ok:true, rows: _getBeginningSheet().getDataRange().getValues()});
-  if (action === 'read_salesorders') return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
-  if (action === 'read_splits')      return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
-  if (action === 'read_served')      return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
+  if (action === 'read_itemcode')      return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
+  if (action === 'read_withdrawals')   return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
+  if (action === 'read_received')      return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
+  if (action === 'read_beginning')     return _json({ok:true, rows: _getBeginningSheet().getDataRange().getValues()});
+  if (action === 'read_salesorders')   return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
+  if (action === 'read_splits')        return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
+  if (action === 'read_served')        return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
+  if (action === 'read_partialrolls')  return _json({ok:true, rows: _getPartialRollsSheet().getDataRange().getValues()});
 
   if (e.parameter.payload) {
     var body;
@@ -392,6 +395,61 @@ function _handleWrite(body) {
     return _json({ok:true, soft:true});
   }
 
+  // ===== PARTIALROLLS =====
+  if (action === 'save_partialroll') {
+    var pr = body.record || {};
+    if (!pr.id) return _json({ok:false, error:'Missing id for save_partialroll'});
+    var psh = _getPartialRollsSheet();
+    var pexisting = _findRowById(psh, 1, pr.id);
+    var prow = [
+      String(pr.id),
+      String(pr.withdrawalId || ''),
+      pr.date || '',
+      String(pr.code || ''),
+      pr.width || '',
+      pr.widthUnit || '',
+      pr.length || '',
+      pr.lengthUnit || '',
+      Number(pr.qty)||0,
+      pr.ref || '',
+      pr.size || ''
+    ];
+    if (pexisting === -1) psh.appendRow(prow);
+    else psh.getRange(pexisting, 1, 1, prow.length).setValues([prow]);
+    return _json({ok:true, id: pr.id});
+  }
+
+  if (action === 'delete_partialroll') {
+    // HARD delete — permanently removes the row. Mirrors delete_withdrawal.
+    var pid = body.id || '';
+    if (!pid) return _json({ok:false, error:'Missing id for delete_partialroll'});
+    var psh2 = _getPartialRollsSheet();
+    var pIdx = _findRowById(psh2, 1, pid);
+    if (pIdx === -1) return _json({ok:true, removed:false});
+    psh2.deleteRow(pIdx);
+    return _json({ok:true, hard:true, row:pIdx});
+  }
+
+  if (action === 'delete_partialroll_by_withdrawal') {
+    // Removes ALL partial roll rows tied to a withdrawal id (col B = WithdrawalID).
+    // Used when a withdrawal itself is deleted.
+    var wid = String(body.withdrawalId || '').trim();
+    if (!wid) return _json({ok:false, error:'Missing withdrawalId'});
+    var psh3 = _getPartialRollsSheet();
+    var lastRow = psh3.getLastRow();
+    if (lastRow < 2) return _json({ok:true, removed:0});
+    var widCol = psh3.getRange(2, 2, lastRow - 1, 1).getValues();
+    var removed = 0;
+    // Iterate bottom-up so row indices stay stable as we delete.
+    for (var ri = widCol.length - 1; ri >= 0; ri--) {
+      if (String(widCol[ri][0]).trim() === wid) {
+        psh3.deleteRow(ri + 2);
+        removed++;
+      }
+    }
+    return _json({ok:true, removed:removed});
+  }
+
   return _json({ok:false, error:'Unknown action: '+action});
 }
 
@@ -447,6 +505,13 @@ function _getServedSheet() {
   var sh = ss.getSheetByName(SERVED_TAB);
   if (!sh) { sh = ss.insertSheet(SERVED_TAB); sh.appendRow(SERVED_HEADER); return sh; }
   if (sh.getLastRow() === 0) sh.appendRow(SERVED_HEADER);
+  return sh;
+}
+function _getPartialRollsSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(PARTIALROLLS_TAB);
+  if (!sh) { sh = ss.insertSheet(PARTIALROLLS_TAB); sh.appendRow(PARTIALROLLS_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(PARTIALROLLS_HEADER);
   return sh;
 }
 
