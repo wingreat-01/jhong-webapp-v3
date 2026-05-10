@@ -2382,12 +2382,9 @@ function parseYardsReceivedRows(rows) {
   if (iQty  < 0) iQty  = 4;
   if (iMrr  < 0) iMrr  = 5;
   if (iSup  < 0) iSup  = 6;
-  if (iRem  < 0) iRem  = 7;
+  // iRem intentionally has no positional fallback — if no 'remarks' column exists, leave as -1
   if (iId   < 0) iId   = 8;
   if (iDel  < 0) iDel  = 9;
-  console.log('[YardsReceived] header:', rows[0]);
-  console.log('[YardsReceived] column map: iCode='+iCode+' iDesc='+iDesc+' iSize='+iSize+' iQty='+iQty+' iMrr='+iMrr+' iId='+iId+' iDel='+iDel);
-  if (rows[1]) console.log('[YardsReceived] row1 raw:', rows[1]);
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
@@ -2403,7 +2400,7 @@ function parseYardsReceivedRows(rows) {
       width:      String(r[iSize]||'').trim(),
       qtyYards:   parseFloat(r[iQty]) || 0,
       withdrawn:  0,    // restored from local state in the merge step
-      remarks:    String(r[iRem]||'').trim(),
+      remarks:    (function(){ var v = iRem >= 0 ? String(r[iRem]||'').trim() : ''; return /^\d{4}-\d{2}-\d{2}/.test(v) ? '' : v; })(),
       _backendId: String(r[iId]||'').trim()
     });
   }
