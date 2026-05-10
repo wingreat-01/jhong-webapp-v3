@@ -2385,6 +2385,9 @@ function parseYardsReceivedRows(rows) {
   if (iRem  < 0) iRem  = 7;
   if (iId   < 0) iId   = 8;
   if (iDel  < 0) iDel  = 9;
+  console.log('[YardsReceived] header:', rows[0]);
+  console.log('[YardsReceived] column map: iCode='+iCode+' iDesc='+iDesc+' iSize='+iSize+' iQty='+iQty+' iMrr='+iMrr+' iId='+iId+' iDel='+iDel);
+  if (rows[1]) console.log('[YardsReceived] row1 raw:', rows[1]);
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
