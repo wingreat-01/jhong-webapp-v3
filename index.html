@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_25.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_26.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -2082,14 +2082,14 @@ function syncNow(opts) {
       function(data){
         if (data && Array.isArray(data.codes) && data.codes.length) {
           STATE.codemapCodes = data.codes;
-          try { renderSalesOrders(); } catch(e){}
+          // Re-apply the GSheet filter now that CODEMAP codes are loaded
+          try { filterSalesOrderGsheet(); } catch(e){}
         }
         bumpProg();
         resolve();
       },
       function(err){
         console.warn('read_codemap:', err);
-        // Non-fatal: Sales Order will fall back to showing all items
         bumpProg();
         resolve();
       });
@@ -6767,9 +6767,11 @@ function loadSalesOrderGsheet() {
 // Build a case-insensitive lookup of valid item codes from STATE.items.
 function _soGsValidCodeSet() {
   var set = {};
-  (STATE.items || []).forEach(function(it){
-    if (it && it.code) set[String(it.code).trim().toLowerCase()] = 1;
-  });
+  // Use CODEMAP column C as the whitelist; fall back to ITEMCODE if not loaded yet.
+  var src = (STATE.codemapCodes && STATE.codemapCodes.length)
+    ? STATE.codemapCodes
+    : (STATE.items || []).map(function(it){ return it && it.code ? String(it.code) : ''; });
+  src.forEach(function(c){ if (c) set[String(c).trim().toLowerCase()] = 1; });
   return set;
 }
 
