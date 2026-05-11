@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_10.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_11.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -3967,18 +3967,33 @@ function save3MYardsRoll() {
       return;
     }
     var existingBackendId = rolls[idx]._backendId || '';
+    // Also capture the original Core No. BEFORE overwriting the roll object —
+    // the backend needs it as a fallback lookup key when _backendId is blank
+    // (e.g. rows added manually in the sheet before the ID column existed).
+    var originalMrrNo = editingCore;
     rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks, _backendId: existingBackendId };
     showToast('Roll updated — syncing to YARDSRECEIVED…', 'success');
 
     // === Sync edit to YARDSRECEIVED sheet in JHONG BACKEND ===
-    // Uses the existing backend row ID so save_yardsreceived does an in-place
-    // update instead of appending a new row.
-    var editId3m = existingBackendId || ('yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5));
+    // Send BOTH the existing id AND the originalMrrNo (Core No.) so the backend
+    // can find the row by ID first, then fall back to mrrNo — preventing a
+    // duplicate append when _backendId is missing.
     var today3mEdit = (function(){
       var d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     })();
-    var editRec3m = { id: editId3m, date: today3mEdit, itemCode: itemId, desc: desc, size: width, qty: qty, mrrNo: coreNo, supplier: '3M', remarks: remarks || '3M Yards Roll' };
+    var editRec3m = {
+      id:             existingBackendId,   // may be blank — backend falls back to originalMrrNo
+      originalMrrNo:  originalMrrNo,       // backend uses this if id lookup fails
+      date:           today3mEdit,
+      itemCode:       itemId,
+      desc:           desc,
+      size:           width,
+      qty:            qty,
+      mrrNo:          coreNo,
+      supplier:       '3M',
+      remarks:        remarks || '3M Yards Roll'
+    };
     var _editIdx = idx; // capture for closure
     postToScript({action:'save_yardsreceived', record: editRec3m},
       function(res){
