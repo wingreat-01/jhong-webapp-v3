@@ -2187,10 +2187,33 @@ function syncNow(opts) {
     );
   }));
 
+  // ── YARDSWITHDRAWN → STATE.threeMYardsWithdrawals ──────────────────
+  // Reads the YARDSWITHDRAWN sheet so the "Withdraw Yards" sub-tab is
+  // consistent across ALL devices, not just the one that made the entries.
+  // Also used below to recompute roll.withdrawn from the live log.
+  total++;
+  jobs.push(new Promise(function(resolve){\r\n    var _settledYwd = false;\r\n    function _finishYwd() { if (_settledYwd) return; _settledYwd = true; bumpProg(); resolve(); }\r\n    var _guardYwd = setTimeout(function(){\r\n      if (!_settledYwd) { console.warn('read_yardswithdrawn: timed out'); failed.push('yardswithdrawn'); _finishYwd(); }\r\n    }, 12000);\r\n    if (!STATE.config.proxyUrl) { clearTimeout(_guardYwd); _finishYwd(); return; }\r\n    fetchFromAppsScript('read_yardswithdrawn',\r\n      function(rows){\r\n        clearTimeout(_guardYwd);\r\n        var parsed = parseYardsWithdrawnRows(rows || []);\r\n        // Only replace local state when the backend has something useful,\r\n        // or is genuinely empty (header-only). Guard against column-name\r\n        // mismatches silently wiping existing local entries.\r\n        var backendHasDataRows = (rows || []).length > 1;\r\n        if (parsed.length > 0 || !backendHasDataRows) {\r\n          STATE.threeMYardsWithdrawals = parsed;\r\n        } else {\r\n          console.warn('read_yardswithdrawn: backend returned', (rows||[]).length-1,\r\n            'rows but parser yielded 0 — keeping local state. Check YARDSWITHDRAWN sheet headers.');\r\n        }\r\n        try { renderTmyWithdrawals(); } catch(e){}\r\n        _finishYwd();\r\n      },\r\n      function(err){\r\n        clearTimeout(_guardYwd);\r\n        console.warn('read_yardswithdrawn:', err);\r\n        failed.push('yardswithdrawn');\r\n        _finishYwd();\r\n      }\r\n    );\r\n  }));
+
   Promise.all(jobs).then(function(){
     _syncInFlight = false;
     if (btn) { btn.textContent = 'Sync Now'; btn.classList.remove('loading'); }
     STATE.lastSync = new Date().toISOString();
+    // Recompute each roll's withdrawn total from the live withdrawal log so
+    // the Yards Stock balance is accurate on any device, not just the one
+    // that made the entries.
+    (function recomputeWithdrawn(){
+      var log = STATE.threeMYardsWithdrawals || [];
+      var wdMap = {};
+      log.forEach(function(w){
+        var key = String(w.coreNo||'').trim().toLowerCase();
+        if (!key) return;
+        wdMap[key] = (wdMap[key]||0) + (parseFloat(w.yards)||0);
+      });
+      (STATE.threeMYards || []).forEach(function(r){
+        var key = String(r.coreNo||'').trim().toLowerCase();
+        r.withdrawn = wdMap.hasOwnProperty(key) ? wdMap[key] : 0;
+      });
+    })();
     saveState();
     try { renderAll(); } catch(e){}
 
@@ -2438,6 +2461,45 @@ function parseYardsReceivedRows(rows) {
       withdrawn:  0,    // restored from local state in the merge step
       remarks:    (function(){ var v = iRem >= 0 ? String(r[iRem]||'').trim() : ''; return /^\d{4}-\d{2}-\d{2}/.test(v) ? '' : v; })(),
       _backendId: String(r[iId]||'').trim()
+    });
+  }
+  return out;
+}
+
+// Parses rows from the YARDSWITHDRAWN sheet.
+// YARDSWITHDRAWN_HEADER: [Date(0), CoreNo(1), ItemID(2), Yards(3), Ref(4), Note(5), ID(6), Deleted(7), DeletedAt(8), DeletedBy(9)]
+function parseYardsWithdrawnRows(rows) {
+  if (!rows || rows.length < 2) return [];
+  var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
+  function col1(names) {
+    for (var i = 0; i < names.length; i++) {
+      var idx = header.indexOf(names[i]);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+  var iDate  = col1(['date']); if (iDate  < 0) iDate  = 0;
+  var iCore  = col1(['coreno','core no','core no.','coreno.','mrrno','mrr no','mrr no.']); if (iCore  < 0) iCore  = 1;
+  var iItem  = col1(['itemid','item id','itemcode','item code']); if (iItem  < 0) iItem  = 2;
+  var iYards = col1(['yards','qty','quantity']); if (iYards < 0) iYards = 3;
+  var iRef   = col1(['ref','reference','so','salesorder']); if (iRef   < 0) iRef   = 4;
+  var iNote  = col1(['note','notes','remarks']); if (iNote  < 0) iNote  = 5;
+  var iId    = col1(['id']); if (iId    < 0) iId    = 6;
+  var iDel   = col1(['deleted']); if (iDel   < 0) iDel   = 7;
+  var out = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (_isDeletedFlag(r[iDel])) continue;
+    var coreNo = String(r[iCore]||'').trim();
+    if (!coreNo) continue;
+    out.push({
+      id:     String(r[iId]||'').trim() || ('ywd_legacy_r'+(i)),
+      date:   String(r[iDate]||'').trim(),
+      coreNo: coreNo,
+      itemId: String(r[iItem]||'').trim(),
+      yards:  parseFloat(r[iYards]) || 0,
+      ref:    String(r[iRef]||'').trim(),
+      note:   String(r[iNote]||'').trim()
     });
   }
   return out;
