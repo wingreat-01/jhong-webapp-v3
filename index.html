@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_17.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_18.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -168,7 +168,7 @@ tbody td{padding:9px 12px;color:#263238;vertical-align:middle}
 .ac-qty{font-size:11px;color:#33691E;font-weight:700;flex-shrink:0}
 
 /* Enlarged Withdraw-tab item-code autocomplete dropdown (#acList) for better readability */
-#acList,#tmyAcList{max-height:460px;min-width:640px;border-radius:10px;border-width:2px;box-shadow:0 12px 32px rgba(46,125,50,0.22)}
+#acList,#tmyAcList{max-height:700px;min-width:640px;border-radius:10px;border-width:2px;box-shadow:0 12px 32px rgba(46,125,50,0.22)}
 #acList .ac-row,#tmyAcList .ac-row{padding:14px 18px;gap:14px}
 #acList .ac-code,#tmyAcList .ac-code{font-size:16px;min-width:200px}
 #acList .ac-desc,#tmyAcList .ac-desc{font-size:16px}
@@ -2800,7 +2800,7 @@ function showItemCodeAC(v) {
     var bn = _isNrSrCode(b.code) ? 0 : 1;
     return an - bn;
   });
-  matches = matches.slice(0, 12);
+  matches = matches.slice(0, 50);
   if (!matches.length) { list.classList.remove('show'); list.innerHTML = ''; return; }
   _acIndex = -1;
   var html = '';
@@ -4139,7 +4139,7 @@ function showTmyItemAC(v) {
     var bn = _isNrSrCode(b.code) ? 0 : 1;
     return an - bn;
   });
-  matches = matches.slice(0, 12);
+  matches = matches.slice(0, 50);
   if (!matches.length) { list.classList.remove('show'); list.innerHTML = ''; return; }
   _tmyAcIndex = -1;
   var html = '';
@@ -5304,38 +5304,24 @@ function _renderTmyWdRefAC(v, list) {
   el.classList.add('show');
 }
 
-
 function pickTmyWdRef(no, customer) {
   var refEl = document.getElementById('tmyWdRef');
   if (refEl) refEl.value = no;
   hideTmyWdRefAC();
+  // Auto-fill Customer field from the selected ref's customer, same as Withdrawal tab
   var custEl = document.getElementById('tmyWdCustomer');
   if (custEl && customer && customer.trim()) {
     custEl.value = customer.trim();
     custEl.style.transition = 'background 0.3s';
     custEl.style.background = '#E8F5E9';
     setTimeout(function() { custEl.style.background = ''; }, 800);
+    var nextEl = document.getElementById('tmyWdYards');
+    if (nextEl) nextEl.focus();
+  } else {
+    var fallbackEl = document.getElementById('tmyWdCustomer');
+    if (fallbackEl) fallbackEl.focus();
   }
-  var submitBtn = document.getElementById('tmyWdSubmitBtn');
-  if (submitBtn) submitBtn.focus();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function hideTmyWdRefAC() {
   var el = document.getElementById('tmyWdRefAcList');
