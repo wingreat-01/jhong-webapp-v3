@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_13.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_14.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -5122,14 +5122,17 @@ function onTmyWdCoreInput() {
 function _syncTmyWdFields(v) {
   var match = (STATE.threeMYards || []).find(function(r){ return (r.coreNo||'').toLowerCase() === (v||'').toLowerCase(); });
   var itemEl  = document.getElementById('tmyWdItemId');
+  var widthEl = document.getElementById('tmyWdWidth');
   var availEl = document.getElementById('tmyWdAvail');
   if (match) {
     var qty = parseFloat(match.qtyYards) || 0;
     var wd  = parseFloat(match.withdrawn) || 0;
     if (itemEl)  itemEl.value  = match.itemId || '';
+    if (widthEl) widthEl.value = match.width  || '';
     if (availEl) availEl.value = (qty - wd) + ' yd';
   } else {
     if (itemEl)  itemEl.value  = '';
+    if (widthEl) widthEl.value = '';
     if (availEl) availEl.value = '';
   }
 }
