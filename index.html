@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_22.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_23.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -9050,22 +9050,20 @@ function renderSalesOrders() {
   var fr = (document.getElementById('soFilterFrom') ? document.getElementById('soFilterFrom').value : '');
   var to = (document.getElementById('soFilterTo')   ? document.getElementById('soFilterTo').value   : '');
 
-  // Build set of valid item codes from CODEMAP column C (falls back to ITEMCODE if CODEMAP not loaded yet)
+  // Build set of valid item codes from CODEMAP column C
   var validCodes = {};
   if (STATE.codemapCodes && STATE.codemapCodes.length) {
     STATE.codemapCodes.forEach(function(c){ if (c) validCodes[String(c).trim()] = 1; });
-  } else {
-    // Fallback: use ITEMCODE sheet so display isn't blank while CODEMAP loads
-    STATE.items.forEach(function(it){ if (it && it.code) validCodes[String(it.code).trim()] = 1; });
   }
 
-  // Take all sales orders, filter items inside each by ITEMCODE membership, drop orders that end up with no items
-  var orders = (STATE.salesOrders || []).map(function(o){
-    var fitems = (o.items || []).filter(function(li){
-      return li && li.code && validCodes[String(li.code).trim()];
-    });
-    return Object.assign({}, o, {items: fitems});
-  }).filter(function(o){ return o.items.length > 0; });
+  // Filter orders by column R (soItemCode) against CODEMAP whitelist.
+  // If CODEMAP hasn't loaded yet, show all orders so screen isn't blank.
+  var hasCodes = Object.keys(validCodes).length > 0;
+  var orders = (STATE.salesOrders || []).filter(function(o){
+    if (!hasCodes) return true;
+    var code = String(o.soItemCode || '').trim();
+    return code && validCodes[code];
+  });
 
   // Apply text filter
   if (q) {
@@ -9168,7 +9166,8 @@ function parseSalesOrderRows(rows) {
       iSize  = colAny(['size','unit']),
       iQty   = colAny(['qty','quantity']),
       iStat  = colAny(['status','state']),
-      iDel   = colAny(['deleted']);
+      iDel   = colAny(['deleted']),
+      iSoItemCode = 17; // Column R (0-based index 17) — item code scanned for warehouse display
 
   // Format A: order-per-row with JSON items column
   if (iItems !== -1) {
@@ -9199,6 +9198,7 @@ function parseSalesOrderRows(rows) {
         remarks: iRem>=0 ? String(r[iRem]||'').trim() : '',
         items: Array.isArray(items) ? items : [],
         status: iStat>=0 ? (String(r[iStat]||'').trim().toLowerCase() || 'pending') : 'pending',
+        soItemCode: String(r[iSoItemCode]||'').trim(), // Column R — item code for warehouse filter
         source: 'backend'
       });
     }
@@ -9233,6 +9233,7 @@ function parseSalesOrderRows(rows) {
           remarks: rem,
           items: [],
           status: stat,
+          soItemCode: String(r2[iSoItemCode]||'').trim(), // Column R — item code for warehouse filter
           source: 'backend',
           _rowIdx: j
         };
