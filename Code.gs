@@ -55,7 +55,7 @@ var PARTIALROLLS_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','Lengt
 var PARTIALWITHDRAW_TAB    = 'PARTIALWITHDRAW';
 var PARTIALWITHDRAW_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Ref','Size','Note','ID','Deleted','DeletedAt','DeletedBy'];
 var YARDSWITHDRAWN_TAB    = 'YARDSWITHDRAWN';
-var YARDSWITHDRAWN_HEADER = ['Date','CoreNo','ItemID','Yards','Ref','Note','ID','Deleted','DeletedAt','DeletedBy'];
+var YARDSWITHDRAWN_HEADER = ['Date','CoreNo','ItemID','Width','Yards','Ref','Customer','ID','Deleted','DeletedAt','DeletedBy'];
 var DISPOSAL_TAB    = 'DISPOSAL';
 var DISPOSAL_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var BEGINNING_HEADER  = ['Date','ItemCode','Description','Size','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
@@ -112,7 +112,8 @@ function doGet(e) {
   if (action === 'read_salesorders')   return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
   if (action === 'read_splits')        return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
   if (action === 'read_served')        return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
-  if (action === 'read_partialrolls')  return _json({ok:true, rows: _getPartialRollsSheet().getDataRange().getValues()});
+  if (action === 'read_partialrolls')    return _json({ok:true, rows: _getPartialRollsSheet().getDataRange().getValues()});
+  if (action === 'read_yardswithdrawn') return _json({ok:true, rows: _getYardsWithdrawnSheet().getDataRange().getValues()});
 
   if (e.parameter.payload) {
     var body;
@@ -340,10 +341,10 @@ function _handleWrite(body) {
     if (!yw.coreNo) return _json({ok:false, error:'Missing coreNo'});
     var ywid = yw.id || _genId('tmywd');
     var ywsh = _getYardsWithdrawnSheet();
-    var ywexisting = _findRowById(ywsh, 7, ywid);
+    var ywexisting = _findRowById(ywsh, 8, ywid);
     var ywrow = [
       yw.date||'', String(yw.coreNo), String(yw.itemId||''),
-      Number(yw.yards)||0, yw.ref||'', _safeText(yw.note||''),
+      yw.width||'', Number(yw.yards)||0, yw.ref||'', _safeText(yw.customer||''),
       ywid, false, '', ''
     ];
     if (ywexisting === -1) ywsh.appendRow(ywrow);
@@ -355,7 +356,7 @@ function _handleWrite(body) {
     var dywid = String(body.id || '').trim();
     if (!dywid) return _json({ok:false, error:'Missing id for delete_yardswithdrawn'});
     var dywsh = _getYardsWithdrawnSheet();
-    var dywIdx = _findRowById(dywsh, 7, dywid);
+    var dywIdx = _findRowById(dywsh, 8, dywid);
     if (dywIdx === -1) return _json({ok:true, removed:false});
     dywsh.deleteRow(dywIdx);
     return _json({ok:true, hard:true, row:dywIdx});

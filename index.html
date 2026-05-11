@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_7.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_8.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -1183,6 +1183,10 @@ header{display:none!important}
           <input class="form-input" type="text" id="tmyWdItemId" readonly="" placeholder="Auto-filled from Core No.">
         </div>
         <div class="form-group">
+          <label class="form-label">Width</label>
+          <input class="form-input" type="text" id="tmyWdWidth" placeholder="e.g. 60&quot;" style="max-width:50%">
+        </div>
+        <div class="form-group">
           <label class="form-label">Available (Yards)</label>
           <input class="form-input" type="text" id="tmyWdAvail" readonly="" placeholder="Auto-filled" style="max-width:50%">
         </div>
@@ -1195,13 +1199,13 @@ header{display:none!important}
           <input class="form-input" type="date" id="tmyWdDate">
         </div>
         <div class="form-group ac-wrap">
-          <label class="form-label">SO / Reference No.</label>
+          <label class="form-label">Ref No.</label>
           <input class="form-input" type="text" id="tmyWdRef" placeholder="Type to search SO / Order No..." autocomplete="off" oninput="onTmyWdRefInput()" onkeydown="onTmyWdRefKey(event)" onblur="setTimeout(hideTmyWdRefAC,180)">
           <div class="ac-list" id="tmyWdRefAcList" style="min-width:320px;max-width:95vw;z-index:60"></div>
         </div>
         <div class="form-group">
-          <label class="form-label">Note / Remarks</label>
-          <input class="form-input" type="text" id="tmyWdNote" placeholder="Optional">
+          <label class="form-label">Customer</label>
+          <input class="form-input" type="text" id="tmyWdCustomer" placeholder="Customer name">
         </div>
       </div>
       <div class="btn-row">
@@ -1229,13 +1233,15 @@ header{display:none!important}
             <th style="width:110px">Date</th>
             <th>Core No.</th>
             <th>Item ID</th>
+            <th>Width</th>
             <th style="text-align:right">Yards</th>
-            <th>SO / Ref</th>
-            <th>Note</th>
+            <th>Ref No.</th>
+            <th>Customer</th>
+            <th style="text-align:right">Available</th>
             <th style="width:90px">Actions</th>
           </tr>
         </thead>
-        <tbody id="tmyWdLogBody"><tr><td colspan="7"><div class="empty-state"><div class="empty-icon">−</div><div class="empty-text">No withdrawals yet.</div></div></td></tr></tbody>
+        <tbody id="tmyWdLogBody"><tr><td colspan="9"><div class="empty-state"><div class="empty-icon">−</div><div class="empty-text">No withdrawals yet.</div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -2494,7 +2500,7 @@ function parseYardsReceivedRows(rows) {
 }
 
 // Parses rows from the YARDSWITHDRAWN sheet.
-// YARDSWITHDRAWN_HEADER: [Date(0),CoreNo(1),ItemID(2),Yards(3),Ref(4),Note(5),ID(6),Deleted(7)]
+// YARDSWITHDRAWN_HEADER: [Date(0),CoreNo(1),ItemID(2),Width(3),Yards(4),Ref(5),Customer(6),ID(7),Deleted(8)]
 function parseYardsWithdrawnRows(rows) {
   if (!rows || rows.length < 2) return [];
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
@@ -2505,14 +2511,15 @@ function parseYardsWithdrawnRows(rows) {
     }
     return -1;
   }
-  var iDate  = col1(['date']); if (iDate  < 0) iDate  = 0;
-  var iCore  = col1(['coreno','core no','core no.','coreno.','mrrno','mrr no','mrr no.']); if (iCore  < 0) iCore  = 1;
-  var iItem  = col1(['itemid','item id','itemcode','item code']); if (iItem  < 0) iItem  = 2;
-  var iYards = col1(['yards','qty','quantity']); if (iYards < 0) iYards = 3;
-  var iRef   = col1(['ref','reference','so','salesorder']); if (iRef   < 0) iRef   = 4;
-  var iNote  = col1(['note','notes','remarks']); if (iNote  < 0) iNote  = 5;
-  var iId    = col1(['id']); if (iId    < 0) iId    = 6;
-  var iDel   = col1(['deleted']); if (iDel   < 0) iDel   = 7;
+  var iDate     = col1(['date']); if (iDate     < 0) iDate     = 0;
+  var iCore     = col1(['coreno','core no','core no.','coreno.','mrrno','mrr no','mrr no.']); if (iCore     < 0) iCore     = 1;
+  var iItem     = col1(['itemid','item id','itemcode','item code']); if (iItem     < 0) iItem     = 2;
+  var iWidth    = col1(['width']); if (iWidth    < 0) iWidth    = 3;
+  var iYards    = col1(['yards','qty','quantity']); if (iYards    < 0) iYards    = 4;
+  var iRef      = col1(['ref','ref no','ref no.','reference','so','salesorder']); if (iRef      < 0) iRef      = 5;
+  var iCustomer = col1(['customer']); if (iCustomer < 0) iCustomer = 6;
+  var iId       = col1(['id']); if (iId       < 0) iId       = 7;
+  var iDel      = col1(['deleted']); if (iDel      < 0) iDel      = 8;
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
@@ -2520,13 +2527,14 @@ function parseYardsWithdrawnRows(rows) {
     var coreNo = String(r[iCore]||'').trim();
     if (!coreNo) continue;
     out.push({
-      id:     String(r[iId]||'').trim() || ('ywd_legacy_r'+(i)),
-      date:   String(r[iDate]||'').trim(),
-      coreNo: coreNo,
-      itemId: String(r[iItem]||'').trim(),
-      yards:  parseFloat(r[iYards]) || 0,
-      ref:    String(r[iRef]||'').trim(),
-      note:   String(r[iNote]||'').trim()
+      id:       String(r[iId]||'').trim() || ('ywd_legacy_r'+(i)),
+      date:     String(r[iDate]||'').trim(),
+      coreNo:   coreNo,
+      itemId:   String(r[iItem]||'').trim(),
+      width:    String(r[iWidth]||'').trim(),
+      yards:    parseFloat(r[iYards]) || 0,
+      ref:      String(r[iRef]||'').trim(),
+      customer: String(r[iCustomer]||'').trim()
     });
   }
   return out;
@@ -4244,16 +4252,18 @@ function renderTmyWithdrawals() {
         || String(b.id||'').localeCompare(String(a.id||''));
   });
   var rows = !q ? all : all.filter(function(w){
-    return (w.date||'').toLowerCase().indexOf(q)   !== -1
-        || (w.coreNo||'').toLowerCase().indexOf(q) !== -1
-        || (w.itemId||'').toLowerCase().indexOf(q) !== -1
-        || (w.ref||'').toLowerCase().indexOf(q)    !== -1
-        || (w.note||'').toLowerCase().indexOf(q)   !== -1;
+    return (w.date||'').toLowerCase().indexOf(q)       !== -1
+        || (w.coreNo||'').toLowerCase().indexOf(q)     !== -1
+        || (w.itemId||'').toLowerCase().indexOf(q)     !== -1
+        || (w.width||'').toLowerCase().indexOf(q)      !== -1
+        || (w.ref||'').toLowerCase().indexOf(q)        !== -1
+        || (w.customer||'').toLowerCase().indexOf(q)   !== -1
+        || (w.note||'').toLowerCase().indexOf(q)       !== -1;
   });
   var badge = document.getElementById('tmyWdLogBadge');
   if (badge) badge.textContent = rows.length + (rows.length === 1 ? ' entry' : ' entries');
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">−</div><div class="empty-text">'
+    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">−</div><div class="empty-text">'
       + (all.length ? 'No withdrawals match your filter.' : 'No withdrawals yet.')
       + '</div></div></td></tr>';
     return;
@@ -4261,13 +4271,19 @@ function renderTmyWithdrawals() {
   var html = '';
   rows.forEach(function(w){
     var safeId = escAttr(w.id||'');
+    // Compute available for this roll at time of display
+    var rolls = STATE.threeMYards || [];
+    var roll = rolls.find(function(r){ return (r.coreNo||'').toLowerCase() === (w.coreNo||'').toLowerCase(); });
+    var availDisp = roll ? Math.max(0, (parseFloat(roll.qtyYards)||0) - (parseFloat(roll.withdrawn)||0)) : '—';
     html += '<tr>'
          + '<td>'+escapeHtml(w.date||'—')+'</td>'
          + '<td class="td-code">'+escapeHtml(w.coreNo||'—')+'</td>'
          + '<td class="td-code" style="color:#BF360C;font-weight:700">'+escapeHtml(w.itemId||'—')+'</td>'
+         + '<td>'+escapeHtml(w.width||'—')+'</td>'
          + '<td style="text-align:right;font-weight:700;color:#C62828">'+(parseFloat(w.yards)||0)+'</td>'
          + '<td>'+escapeHtml(w.ref||'—')+'</td>'
-         + '<td>'+escapeHtml(w.note||'—')+'</td>'
+         + '<td>'+escapeHtml(w.customer||'—')+'</td>'
+         + '<td style="text-align:right;color:#1B5E20;font-weight:600">'+(typeof availDisp === 'number' ? availDisp : availDisp)+'</td>'
          + '<td style="white-space:nowrap;display:flex;gap:4px">'
          + '<button class="btn-secondary" style="padding:4px 8px;font-size:11px;background:#E3F2FD;color:#1565C0;border-color:#90CAF9" onclick="editTmyWithdrawal(\''+safeId+'\')">✏ Edit</button>'
          + (STATE._isAdmin
@@ -4292,12 +4308,13 @@ function editTmyWithdrawal(id) {
 
   // Populate form fields
   var fields = {
-    tmyWdCoreNo: entry.coreNo || '',
-    tmyWdItemId: entry.itemId || '',
-    tmyWdYards:  entry.yards  || '',
-    tmyWdDate:   entry.date   || '',
-    tmyWdRef:    entry.ref    || '',
-    tmyWdNote:   entry.note   || ''
+    tmyWdCoreNo:  entry.coreNo    || '',
+    tmyWdItemId:  entry.itemId    || '',
+    tmyWdWidth:   entry.width     || '',
+    tmyWdYards:   entry.yards     || '',
+    tmyWdDate:    entry.date      || '',
+    tmyWdRef:     entry.ref       || '',
+    tmyWdCustomer: entry.customer || ''
   };
   Object.keys(fields).forEach(function(fid){
     var el = document.getElementById(fid);
@@ -4321,11 +4338,12 @@ function editTmyWithdrawal(id) {
 }
 
 function withdraw3MYards() {
-  var coreNo = (document.getElementById('tmyWdCoreNo').value || '').trim();
-  var yards  = parseFloat(document.getElementById('tmyWdYards').value);
-  var date   = (document.getElementById('tmyWdDate').value || '').trim();
-  var ref    = (document.getElementById('tmyWdRef').value  || '').trim();
-  var note   = (document.getElementById('tmyWdNote').value || '').trim();
+  var coreNo   = (document.getElementById('tmyWdCoreNo').value    || '').trim();
+  var width    = (document.getElementById('tmyWdWidth').value     || '').trim();
+  var yards    = parseFloat(document.getElementById('tmyWdYards').value);
+  var date     = (document.getElementById('tmyWdDate').value      || '').trim();
+  var ref      = (document.getElementById('tmyWdRef').value       || '').trim();
+  var customer = (document.getElementById('tmyWdCustomer').value  || '').trim();
 
   if (!coreNo) { showToast('Core No. is required', 'error'); return; }
   if (isNaN(yards) || yards <= 0) { showToast('Yards Withdrawn must be greater than 0', 'error'); return; }
@@ -4363,7 +4381,7 @@ function withdraw3MYards() {
     }
     rolls2[rIdx3] = Object.assign({}, roll3, { withdrawn: prev3 + yards });
 
-    var updatedEntry = Object.assign({}, oldEntry, { date: date, coreNo: roll3.coreNo, itemId: roll3.itemId||'', yards: yards, ref: ref, note: note });
+    var updatedEntry = Object.assign({}, oldEntry, { date: date, coreNo: roll3.coreNo, itemId: roll3.itemId||'', width: width, yards: yards, ref: ref, customer: customer });
     log2[eIdx] = updatedEntry;
 
     _tmyWdEditId = null;
@@ -4377,7 +4395,7 @@ function withdraw3MYards() {
     render3MYards();
     postToScript({action:'save_yardswithdrawn', record: {
       id: updatedEntry.id, date: updatedEntry.date, coreNo: updatedEntry.coreNo,
-      itemId: updatedEntry.itemId, yards: updatedEntry.yards, ref: updatedEntry.ref, note: updatedEntry.note
+      itemId: updatedEntry.itemId, width: updatedEntry.width, yards: updatedEntry.yards, ref: updatedEntry.ref, customer: updatedEntry.customer
     }},
       function(){ /* updated */ },
       function(err){ showToast('Updated locally — YARDSWITHDRAWN sync failed: '+err, 'error'); }
@@ -4408,9 +4426,10 @@ function withdraw3MYards() {
     date: date,
     coreNo: roll.coreNo,
     itemId: roll.itemId || '',
+    width: width,
     yards: yards,
     ref: ref,
-    note: note
+    customer: customer
   };
   log.unshift(entry);
 
@@ -4421,13 +4440,14 @@ function withdraw3MYards() {
   render3MYards();
   // Sync to YARDSWITHDRAWN sheet in JHONG BACKEND
   postToScript({action:'save_yardswithdrawn', record: {
-    id:     entry.id,
-    date:   entry.date,
-    coreNo: entry.coreNo,
-    itemId: entry.itemId,
-    yards:  entry.yards,
-    ref:    entry.ref,
-    note:   entry.note
+    id:       entry.id,
+    date:     entry.date,
+    coreNo:   entry.coreNo,
+    itemId:   entry.itemId,
+    width:    entry.width,
+    yards:    entry.yards,
+    ref:      entry.ref,
+    customer: entry.customer
   }},
     function(){ /* saved */ },
     function(err){ showToast('Yards withdrawal saved locally — YARDSWITHDRAWN sync failed: '+err, 'error'); }
@@ -4435,7 +4455,7 @@ function withdraw3MYards() {
 }
 
 function clear3MYardsWithdrawForm() {
-  ['tmyWdCoreNo','tmyWdItemId','tmyWdAvail','tmyWdYards','tmyWdRef','tmyWdNote'].forEach(function(id){
+  ['tmyWdCoreNo','tmyWdItemId','tmyWdWidth','tmyWdAvail','tmyWdYards','tmyWdRef','tmyWdCustomer'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
