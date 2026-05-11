@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_8.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_9.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -2528,7 +2528,7 @@ function parseYardsWithdrawnRows(rows) {
     if (!coreNo) continue;
     out.push({
       id:       String(r[iId]||'').trim() || ('ywd_legacy_r'+(i)),
-      date:     String(r[iDate]||'').trim(),
+      date:     formatRawDate(String(r[iDate]||'').trim()),
       coreNo:   coreNo,
       itemId:   String(r[iItem]||'').trim(),
       width:    String(r[iWidth]||'').trim(),
