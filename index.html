@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_32.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_33.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -6822,6 +6822,17 @@ function parseSalesOrderGsheetCSV(csvText) {
 
   var validSet = _soGsValidCodeSet();
 
+  // ── DIAGNOSTIC: open browser console (F12) to see column layout ──
+  console.log('[SO-DEBUG] Header (' + headerCols.length + ' cols):', headerCols);
+  console.log('[SO-DEBUG] SO_GS_ITEMID_COL =', SO_GS_ITEMID_COL, '| CODEMAP has', Object.keys(validSet).length, 'codes:', Object.keys(validSet).slice(0,8));
+  for (var _di = dataStart, _dn = 0; _di < lines.length && _dn < 3; _di++) {
+    if (!lines[_di].trim()) continue;
+    var _dc = parseCSVLine(lines[_di]);
+    console.log('[SO-DEBUG] Row ' + _di + ': col[' + SO_GS_ITEMID_COL + ']=' + JSON.stringify(_dc[SO_GS_ITEMID_COL]) + ' | full row:', _dc.map(function(v,i){return i+'='+JSON.stringify(v);}).join(' '));
+    _dn++;
+  }
+  // ─────────────────────────────────────────────────────────────────
+
   // Try to find a "date" column for date-range filtering. Default = col A (idx 0).
   var dateIdx = -1;
   headerCols.forEach(function(h, idx){
@@ -6831,16 +6842,16 @@ function parseSalesOrderGsheetCSV(csvText) {
   if (dateIdx === -1) dateIdx = 0;
 
   var kept = [];
+  var _skippedNoId = 0, _skippedNotInMap = 0;
   for (var r = dataStart; r < lines.length; r++) {
     if (!lines[r].trim()) continue;
     var cols = parseCSVLine(lines[r]);
 
-    // Item ID is in Col C (idx 2).
     var itemId = String(cols[SO_GS_ITEMID_COL] || '').trim();
-    if (!itemId) continue;
+    if (!itemId) { _skippedNoId++; continue; }
 
     // Only keep rows whose Item ID is in the CODEMAP whitelist.
-    if (!(itemId.toLowerCase() in validSet)) continue;
+    if (!(itemId.toLowerCase() in validSet)) { _skippedNotInMap++; continue; }
 
     var rawDate = String(cols[dateIdx] || '').trim();
     kept.push({
@@ -6856,6 +6867,7 @@ function parseSalesOrderGsheetCSV(csvText) {
     var tb = (b._dateMs == null) ? -Infinity : b._dateMs;
     return tb - ta;
   });
+  console.log('[SO-DEBUG] Parse done: kept=' + kept.length + ' skippedNoId=' + _skippedNoId + ' skippedNotInCodemap=' + _skippedNotInMap);
   STATE.salesOrderGsheet = kept;
 }
 
