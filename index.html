@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_11.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_12.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -5335,16 +5335,19 @@ function pickTmyWdRef(no, customer) {
   var refEl = document.getElementById('tmyWdRef');
   if (refEl) refEl.value = no;
   hideTmyWdRefAC();
-  // Auto-fill Note/Remarks with customer if the field is empty
-  var noteEl = document.getElementById('tmyWdNote');
-  if (noteEl && customer && customer.trim() && !noteEl.value.trim()) {
-    noteEl.value = customer.trim();
-    noteEl.style.transition = 'background 0.3s';
-    noteEl.style.background = '#E8F5E9';
-    setTimeout(function() { noteEl.style.background = ''; }, 800);
+  // Auto-fill Customer field from the selected ref's customer, same as Withdrawal tab
+  var custEl = document.getElementById('tmyWdCustomer');
+  if (custEl && customer && customer.trim()) {
+    custEl.value = customer.trim();
+    custEl.style.transition = 'background 0.3s';
+    custEl.style.background = '#E8F5E9';
+    setTimeout(function() { custEl.style.background = ''; }, 800);
+    var nextEl = document.getElementById('tmyWdYards');
+    if (nextEl) nextEl.focus();
+  } else {
+    var fallbackEl = document.getElementById('tmyWdCustomer');
+    if (fallbackEl) fallbackEl.focus();
   }
-  var nextEl = document.getElementById('tmyWdNote');
-  if (nextEl) nextEl.focus();
 }
 
 function hideTmyWdRefAC() {
