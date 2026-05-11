@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_6.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_7.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -1194,9 +1194,10 @@ header{display:none!important}
           <label class="form-label">Date</label>
           <input class="form-input" type="date" id="tmyWdDate">
         </div>
-        <div class="form-group">
+        <div class="form-group ac-wrap">
           <label class="form-label">SO / Reference No.</label>
-          <input class="form-input" type="text" id="tmyWdRef" placeholder="Optional">
+          <input class="form-input" type="text" id="tmyWdRef" placeholder="Type to search SO / Order No..." autocomplete="off" oninput="onTmyWdRefInput()" onkeydown="onTmyWdRefKey(event)" onblur="setTimeout(hideTmyWdRefAC,180)">
+          <div class="ac-list" id="tmyWdRefAcList" style="min-width:320px;max-width:95vw;z-index:60"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Note / Remarks</label>
@@ -2518,24 +2519,9 @@ function parseYardsWithdrawnRows(rows) {
     if (_isDeletedFlag(r[iDel])) continue;
     var coreNo = String(r[iCore]||'').trim();
     if (!coreNo) continue;
-    var rawDate = r[iDate];
-    var dateStr = '';
-    if (rawDate instanceof Date) {
-      dateStr = rawDate.getFullYear()+'-'+String(rawDate.getMonth()+1).padStart(2,'0')+'-'+String(rawDate.getDate()).padStart(2,'0');
-    } else {
-      var s = String(rawDate||'').trim();
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-        dateStr = s.slice(0,10);
-      } else if (s) {
-        var d = new Date(s);
-        dateStr = !isNaN(d.getTime())
-          ? d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
-          : s.slice(0,10);
-      }
-    }
     out.push({
       id:     String(r[iId]||'').trim() || ('ywd_legacy_r'+(i)),
-      date:   dateStr,
+      date:   String(r[iDate]||'').trim(),
       coreNo: coreNo,
       itemId: String(r[iItem]||'').trim(),
       yards:  parseFloat(r[iYards]) || 0,
@@ -5197,6 +5183,166 @@ function onTmyWdCoreKey(e) {
   } else if (e.key === 'Escape') {
     hideTmyWdCoreAC();
   }
+}
+
+// ---------- SO/Ref No. autocomplete (Withdraw Yards form) ----------
+var _tmyWdRefAcIdx = -1;
+var _tmyWdRefDebounce = null;
+
+function onTmyWdRefInput() {
+  var v = (document.getElementById('tmyWdRef').value || '').trim();
+  _tmyWdRefAcIdx = -1;
+  if (!v) { hideTmyWdRefAC(); return; }
+  // Show from memory immediately
+  _renderTmyWdRefAC(v, _tmyWdRefBuildList());
+  // Debounced live fetch
+  clearTimeout(_tmyWdRefDebounce);
+  _tmyWdRefDebounce = setTimeout(function() { _tmyWdRefFetchLive(v); }, 300);
+}
+
+function _tmyWdRefBuildList() {
+  // Pull unique order nos + customers from STATE.salesOrders and STATE.withdrawals
+  var seen = {}, out = [];
+  (STATE.salesOrders || []).forEach(function(o) {
+    var no = (o.orderNo || '').trim();
+    var cust = (o.customer || '').trim();
+    if (!no || seen[no]) return;
+    seen[no] = true;
+    out.push({ no: no, customer: cust });
+  });
+  (STATE.withdrawals || []).forEach(function(w) {
+    var no = (w.withdrawalNo || '').trim();
+    var cust = (w.customer || '').trim();
+    if (!no || seen[no]) return;
+    seen[no] = true;
+    out.push({ no: no, customer: cust });
+  });
+  return out;
+}
+
+function _tmyWdRefFetchLive(typed) {
+  // Reuse the same published SALESORDER CSV as the Withdrawal No AC
+  var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSa1nCpmEPrAt1EB_7xW20MIlxJPXhqRY-hFpsx9x5gsvzmNv1sld8UQ7MSumaty0z_Ye8-bALyHg8Q/pub?gid=1859862657&single=true&output=csv';
+  function parseCSV(text) {
+    var rows = [], row = [], cur = '', inQ = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (inQ) {
+        if (c === '"' && text[i+1] === '"') { cur += '"'; i++; }
+        else if (c === '"') { inQ = false; }
+        else { cur += c; }
+      } else {
+        if (c === '"') { inQ = true; }
+        else if (c === ',') { row.push(cur); cur = ''; }
+        else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+        else if (c !== '\r') { cur += c; }
+      }
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+  fetch(CSV_URL, { cache: 'no-cache', redirect: 'follow' })
+    .then(function(r) { return r.text(); })
+    .then(function(csv) {
+      var rows = parseCSV(csv);
+      if (rows.length < 2) return;
+      var hdr = rows[0].map(function(h) { return String(h||'').trim().toLowerCase().replace(/[\s.#_]+/g,''); });
+      var iNo   = hdr.indexOf('orderno');   if (iNo   < 0) iNo   = 2;
+      var iCust = hdr.indexOf('customer');  if (iCust < 0) iCust = 5;
+      var iDel  = hdr.indexOf('deleted');
+      var seen = {}, list = [];
+      for (var i = 1; i < rows.length; i++) {
+        var r = rows[i];
+        if (iDel >= 0 && String(r[iDel]||'').trim().toLowerCase() === 'true') continue;
+        var no   = String(r[iNo]  ||'').trim();
+        var cust = String(r[iCust]||'').trim();
+        if (!no || seen[no]) continue;
+        seen[no] = true;
+        list.push({ no: no, customer: cust });
+      }
+      // Merge in-memory list for anything not in CSV
+      _tmyWdRefBuildList().forEach(function(m) {
+        if (!seen[m.no]) { seen[m.no] = true; list.push(m); }
+      });
+      var refEl = document.getElementById('tmyWdRef');
+      if (refEl && document.activeElement === refEl) {
+        var cur = refEl.value.trim();
+        if (cur) _renderTmyWdRefAC(cur, list);
+      }
+    })
+    .catch(function(e) { console.warn('[TmyWdRef] CSV fetch failed:', e); });
+}
+
+function _renderTmyWdRefAC(v, list) {
+  var el = document.getElementById('tmyWdRefAcList');
+  if (!el) return;
+  var lv = v.toLowerCase();
+  var hits = (list || []).filter(function(m) { return m.no.toLowerCase().indexOf(lv) !== -1; }).slice(0, 25);
+  if (!hits.length) { hideTmyWdRefAC(); return; }
+  _tmyWdRefAcIdx = -1;
+  el.innerHTML = '';
+  hits.forEach(function(m, i) {
+    var row = document.createElement('div');
+    row.className = 'ac-row';
+    row.setAttribute('data-idx', i);
+    row.setAttribute('data-no', m.no);
+    row.setAttribute('data-customer', m.customer || '');
+    row.innerHTML = '<span class="ac-code">' + escapeHtml(m.no) + '</span>'
+      + (m.customer ? '<span class="ac-desc">\u{1F464} ' + escapeHtml(m.customer) + '</span>' : '');
+    row.addEventListener('mousedown', function(e) { e.preventDefault(); });
+    row.addEventListener('click', function() { pickTmyWdRef(this.getAttribute('data-no'), this.getAttribute('data-customer')); });
+    el.appendChild(row);
+  });
+  el.classList.add('show');
+}
+
+function pickTmyWdRef(no, customer) {
+  var refEl = document.getElementById('tmyWdRef');
+  if (refEl) refEl.value = no;
+  hideTmyWdRefAC();
+  // Auto-fill Note/Remarks with customer if the field is empty
+  var noteEl = document.getElementById('tmyWdNote');
+  if (noteEl && customer && customer.trim() && !noteEl.value.trim()) {
+    noteEl.value = customer.trim();
+    noteEl.style.transition = 'background 0.3s';
+    noteEl.style.background = '#E8F5E9';
+    setTimeout(function() { noteEl.style.background = ''; }, 800);
+  }
+  var nextEl = document.getElementById('tmyWdNote');
+  if (nextEl) nextEl.focus();
+}
+
+function hideTmyWdRefAC() {
+  var el = document.getElementById('tmyWdRefAcList');
+  if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+  _tmyWdRefAcIdx = -1;
+}
+
+function onTmyWdRefKey(e) {
+  var el = document.getElementById('tmyWdRefAcList');
+  var rows = el ? el.querySelectorAll('.ac-row') : [];
+  if (!rows.length) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _tmyWdRefAcIdx = Math.min(rows.length - 1, _tmyWdRefAcIdx + 1);
+    _tmyWdRefHighlight(rows);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _tmyWdRefAcIdx = Math.max(0, _tmyWdRefAcIdx - 1);
+    _tmyWdRefHighlight(rows);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (_tmyWdRefAcIdx >= 0 && rows[_tmyWdRefAcIdx]) rows[_tmyWdRefAcIdx].click();
+    else if (rows.length === 1) rows[0].click();
+    else hideTmyWdRefAC();
+  } else if (e.key === 'Escape') {
+    hideTmyWdRefAC();
+  }
+}
+
+function _tmyWdRefHighlight(rows) {
+  for (var i = 0; i < rows.length; i++) rows[i].classList.toggle('active', i === _tmyWdRefAcIdx);
+  if (_tmyWdRefAcIdx >= 0 && rows[_tmyWdRefAcIdx]) rows[_tmyWdRefAcIdx].scrollIntoView({ block: 'nearest' });
 }
 
 function toIsoDate(raw) {
