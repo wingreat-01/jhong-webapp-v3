@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_38.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_39.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -664,7 +664,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
+  <span class="sync-progress" id="syncIndicatorProgress">9/10</span>
 </div>
 
 <div class="toast" id="toast">Synced in 6.1s (partial: received, salesorders, yardsreceived, beginning, yardswithdrawn, withdrawals, partialrolls, itemcode)</div>
@@ -6864,8 +6864,14 @@ function filterSalesOrderGsheet() {
   var q = (document.getElementById('soGsFilter') ? document.getElementById('soGsFilter').value : '').toLowerCase().trim();
   var fr = document.getElementById('soGsDateFrom') ? document.getElementById('soGsDateFrom').value : '';
   var to = document.getElementById('soGsDateTo')   ? document.getElementById('soGsDateTo').value   : '';
-  var frMs = fr ? Date.parse(fr) : null;
-  var toMs = to ? (Date.parse(to) + 86400000) : null;
+  // Parse date inputs as LOCAL midnight (same as _parseSoDateMs) to avoid timezone mismatch
+  var _localMidnight = function(str) {
+    var m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return new Date(+m[1], +m[2]-1, +m[3]).getTime();
+    return Date.parse(str);
+  };
+  var frMs = fr ? _localMidnight(fr) : null;
+  var toMs = to ? (_localMidnight(to) + 86400000 - 1) : null;
   STATE.salesOrderGsheetFiltered = (STATE.salesOrderGsheet || []).filter(function(row){
     if (q) {
       var hit = false;
