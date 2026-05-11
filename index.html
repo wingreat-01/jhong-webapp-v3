@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_41.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_42.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -6501,7 +6501,7 @@ var SO_GS_ITEMID_COL = 17; // Col R — ITEM ID
 // ITEM ID is at col R (idx 17). Other idx values below match the SALESORDER sheet layout.
 var SO_GS_COLUMNS = [
   {label: 'Date',             idx: 0,  type: 'date'},
-  {label: 'Job Order',        idx: 1},
+  {label: 'Job Order',        idx: 2},
   {label: 'Item ID',          idx: 17, type: 'itemid'},
   {label: 'Item Description', idx: 18},
   {label: 'W',                idx: 13, align: 'right'},
@@ -6517,7 +6517,7 @@ var SO_GS_COLUMNS = [
 // Stable key per row for the local "Ready" tracker. Job Order + Item ID
 // uniquely identifies a line within an order (one Job Order can have many items).
 function _soGsRowKey(row) {
-  var jo = String(row.cols[1] || '').trim(); // Col B = Job Order
+  var jo = String(row.cols[2] || '').trim(); // Col C = Job Order
   var id = String(row._itemId || '').trim();
   return (jo + '||' + id).toLowerCase();
 }
