@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_15.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_16.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -650,7 +650,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">8/9</span>
+  <span class="sync-progress" id="syncIndicatorProgress">7/9</span>
 </div>
 
 <div class="toast" id="toast">Synced in 6.1s (partial: received, salesorders, yardsreceived, beginning, yardswithdrawn, withdrawals, partialrolls, itemcode)</div>
@@ -4512,7 +4512,11 @@ function deleteTmyWithdrawal(id) {
   renderTmyWithdrawals();
   render3MYards();
   // Delete from YARDSWITHDRAWN sheet in JHONG BACKEND
-  postToScript({action:'delete_yardswithdrawn', id: id},
+  // Also send coreNo/ref/yards as fallback keys for legacy rows where the
+  // sheet's ID column (H) was blank — those get a synthetic ywd_legacy_rN id
+  // that was never written to the sheet, so the backend needs another way to
+  // identify the row.
+  postToScript({action:'delete_yardswithdrawn', id: id, coreNo: entry.coreNo, ref: entry.ref, yards: entry.yards},
     function(){ /* deleted */ },
     function(err){ showToast('Deleted locally — YARDSWITHDRAWN sheet delete failed: '+err, 'error'); }
   );
@@ -5128,17 +5132,7 @@ function _syncTmyWdFields(v) {
     var qty = parseFloat(match.qtyYards) || 0;
     var wd  = parseFloat(match.withdrawn) || 0;
     if (itemEl)  itemEl.value  = match.itemId || '';
-    // Width comes from YARDSRECEIVED column D (Size).
-    // For older rolls where that column was blank, fall back to the
-    // matching ITEMCODE row's size field so the field always autofills.
-    var resolvedWidth = match.width || '';
-    if (!resolvedWidth && match.itemId) {
-      var icMatch = (STATE.items || []).find(function(it){
-        return String(it.code||'').toLowerCase() === String(match.itemId||'').toLowerCase();
-      });
-      if (icMatch) resolvedWidth = icMatch.size || '';
-    }
-    if (widthEl) widthEl.value = resolvedWidth;
+    if (widthEl) widthEl.value = match.width  || '';
     if (availEl) availEl.value = (qty - wd) + ' yd';
   } else {
     if (itemEl)  itemEl.value  = '';
@@ -5170,19 +5164,12 @@ function _renderTmyWdCoreAC() {
     var wd    = parseFloat(r.withdrawn) || 0;
     var avail = qty - wd;
     var availColor = avail <= 0 ? 'color:#C62828' : (avail < qty * 0.2 ? 'color:#E65100' : '');
-    // Resolve width: prefer roll's own width, fall back to ITEMCODE size
-    var displayWidth = r.width || '';
-    if (!displayWidth && r.itemId) {
-      var _icm = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === String(r.itemId||'').toLowerCase(); });
-      if (_icm) displayWidth = _icm.size || '';
-    }
     return '<div class="ac-row'+(i === _tmyWdAcIndex ? ' active' : '')+'" '
       + 'onmousedown="event.preventDefault()" '
       + 'onclick="pickTmyWdCore(\''+escAttr(r.coreNo)+'\')" '
       + 'data-idx="'+i+'">'
       + '<span style="font-family:monospace;font-weight:700;color:#2E7D32;font-size:12px;flex-shrink:0;min-width:90px">'+escapeHtml(r.coreNo||'—')+'</span>'
       + '<span style="font-size:12px;color:#1565C0;font-weight:600;flex-shrink:0;min-width:100px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(r.itemId||'')+'</span>'
-      + (displayWidth ? '<span style="font-size:11px;color:#E65100;font-weight:700;flex-shrink:0;background:#FFF3E0;border:1px solid #FFE0B2;padding:2px 7px;border-radius:10px;font-family:monospace;white-space:nowrap">'+escapeHtml(displayWidth)+'</span>' : '')
       + '<span class="ac-desc">'+escapeHtml(r.itemDesc||'')+'</span>'
       + '<span class="ac-qty" style="'+availColor+'">'+avail+' yd</span>'
       + '</div>';
