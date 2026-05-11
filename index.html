@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_9.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_10.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -8371,7 +8371,13 @@ function formatRawDate(raw) {
   raw = String(raw).trim();
   if (!raw || raw === '—') return '—';
   try {
-    var d = new Date(raw);
+    var d;
+    var dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      d = new Date(+dateOnly[1], +dateOnly[2] - 1, +dateOnly[3]);
+    } else {
+      d = new Date(raw);
+    }
     if (!isNaN(d)) return d.toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'});
   } catch(e) {}
   return raw;
