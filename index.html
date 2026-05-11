@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_26.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_28.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -6491,31 +6491,41 @@ var URL_CACHE_TTL_MS = 30000;
 // paginated table. Adapted from YMCC's withdrawal-records-from-gsheet.
 // ============================================================
 
-// SALESORDER tab column R is "ITEM ID" — A=0, B=1 ... R=17
-var SO_GS_ITEMID_COL = 17;
+// SALESORDER CSV column layout (0-based), matching the published GSheet tab:
+// Col A=0  Date
+// Col B=1  Job Order
+// Col C=2  Item ID
+// Col D=3  Item Description
+// Col E=4  W
+// Col F=5  L
+// Col G=6  Qty
+// Col H=7  Unit
+// Col I=8  Customer
+// Col J=9  Status
+// Col K=10 Sales
+// (Action is local-only, no CSV column)
+var SO_GS_ITEMID_COL = 2;
 
-// Fixed display spec: only these columns are shown, in this order.
-// `idx` is the 0-based source column from the SALESORDER CSV.
-//   A=0 B=1 C=2 D=3 E=4 F=5 G=6 H=7 I=8 J=9 K=10 L=11 M=12 N=13 O=14 P=15 Q=16 R=17
+// Display spec — idx must match the column positions above.
 var SO_GS_COLUMNS = [
-  {label: 'Date',      idx: 0,  type: 'date'},                            // Col A
-  {label: 'Job Order', idx: 2},                                            // Col C
-  {label: 'Item ID',   idx: 17, type: 'itemid'},                           // Col R
-  {label: 'Item Description', type: 'itemdesc'},                          // resolved from ITEMCODE
-  {label: 'W',         idx: 13, align: 'right', unitIdx: 14},               // Col N + unit O
-  {label: 'L',         idx: 15, align: 'right', unitIdx: 16},               // Col P + unit Q
-  {label: 'Qty',       idx: 11, align: 'right', strong: true},             // Col L
-  {label: 'Unit',      idx: 12},                                            // Col M
-  {label: 'Customer',  idx: 5},                                            // Col F
-  {label: 'Status',    idx: 10, type: 'status'},                           // Col K
-  {label: 'Sales',     idx: 7},                                            // Col H
-  {label: 'Action',    type: 'ready'}                                      // local-only Ready button
+  {label: 'Date',             idx: 0, type: 'date'},
+  {label: 'Job Order',        idx: 1},
+  {label: 'Item ID',          idx: 2, type: 'itemid'},
+  {label: 'Item Description', idx: 3},
+  {label: 'W',                idx: 4, align: 'right'},
+  {label: 'L',                idx: 5, align: 'right'},
+  {label: 'Qty',              idx: 6, align: 'right', strong: true},
+  {label: 'Unit',             idx: 7},
+  {label: 'Customer',         idx: 8},
+  {label: 'Status',           idx: 9, type: 'status'},
+  {label: 'Sales',            idx: 10},
+  {label: 'Action',           type: 'ready'}
 ];
 
 // Stable key per row for the local "Ready" tracker. Job Order + Item ID
 // uniquely identifies a line within an order (one Job Order can have many items).
 function _soGsRowKey(row) {
-  var jo = String(row.cols[2] || '').trim();
+  var jo = String(row.cols[1] || '').trim();  // Col B = Job Order (idx 1)
   var id = String(row._itemId || '').trim();
   return (jo + '||' + id).toLowerCase();
 }
@@ -6936,17 +6946,17 @@ function markSoGsRowServed(rowKey) {
   var rec = {
     id: 'srv_'+Date.now()+'_'+Math.random().toString(36).substr(2,5),
     rowKey: rowKey,
-    date: col(0),
-    jobOrder: col(2),
-    itemId: src._itemId || col(17),
-    width: col(13),
-    length: col(15),
-    qty: parseFloat(col(11)) || 0,
-    unit: col(12),
-    customer: col(5),
-    urgency: col(9),
-    status: col(10),
-    sales: col(7),
+    date: col(0),   // Col A
+    jobOrder: col(1),   // Col B
+    itemId: src._itemId || col(2),  // Col C
+    width: col(4),  // Col E
+    length: col(5), // Col F
+    qty: parseFloat(col(6)) || 0,   // Col G
+    unit: col(7),   // Col H
+    customer: col(8),   // Col I
+    urgency: '',
+    status: col(9), // Col J
+    sales: col(10), // Col K
     servedAt: new Date().toISOString(),
     source: 'pending'
   };

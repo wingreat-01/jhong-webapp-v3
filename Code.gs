@@ -39,6 +39,7 @@ var ADMIN_PIN = '7777';
 var USER_PIN  = '1234';
 
 var ITEMCODE_TAB        = 'ITEMCODE';
+var CODEMAP_TAB         = 'CODEMAP';
 var WITHDRAWAL_TAB      = 'WITHDRAWAL';
 var RECEIVED_TAB        = 'RECEIVED';
 var YARDSRECEIVED_TAB   = 'YARDSRECEIVED';
@@ -105,6 +106,7 @@ function doGet(e) {
   }
 
   if (action === 'read_itemcode')      return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
+  if (action === 'read_codemap')       return _json({ok:true, codes: _getCodemapCodes()});
   if (action === 'read_withdrawals')   return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
   if (action === 'read_received')      return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
   if (action === 'read_yardsreceived') return _json({ok:true, rows: _getYardsReceivedSheet().getDataRange().getValues()});
@@ -582,6 +584,22 @@ function _getItemcodeSheet() {
   var sh = ss.getSheetByName(ITEMCODE_TAB);
   if (!sh) throw new Error('ITEMCODE tab not found in JHONG BACKEND.');
   return sh;
+}
+// Returns a flat array of item code strings from CODEMAP column C (skips header row 1).
+function _getCodemapCodes() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(CODEMAP_TAB);
+  if (!sh) return [];
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+  // Column C = column index 3
+  var values = sh.getRange(2, 3, lastRow - 1, 1).getValues();
+  var codes = [];
+  values.forEach(function(row) {
+    var v = String(row[0] || '').trim();
+    if (v) codes.push(v);
+  });
+  return codes;
 }
 function _getWithdrawalSheet() {
   var ss = _openSS();
