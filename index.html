@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_23.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_24.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -413,6 +413,20 @@ tr.so-marked-ready > td.so-ready-row-keep{color:inherit !important}
 .so-item-chip .chip-qty{font-size:14px;font-weight:700;color:#FB8C00;background:#FFF8E1;border-radius:6px;padding:2px 8px;margin-top:auto;align-self:flex-start}
 
 .so-item-chip-empty{color:#90A4AE;font-size:12px;font-style:italic;padding:14px;text-align:center;width:100%}
+/* Warehouse sales order table */
+.so-wh-table{width:100%;border-collapse:collapse;font-size:13px}
+.so-wh-table thead tr{background:linear-gradient(135deg,#FFF8E1,#FFE0B2);position:sticky;top:0;z-index:2}
+.so-wh-table th{padding:10px 12px;text-align:left;font-weight:700;color:#BF360C;border-bottom:2px solid #FFCC80;white-space:nowrap}
+.so-wh-table td{padding:9px 12px;border-bottom:1px solid #FFF3E0;vertical-align:middle;color:#263238}
+.so-wh-table tbody tr:hover{background:#FFF8E1}
+.so-wh-table tbody tr:nth-child(even){background:#FAFAFA}
+.so-wh-table tbody tr:nth-child(even):hover{background:#FFF8E1}
+.so-wh-joborder{font-family:monospace;font-weight:700;color:#BF360C}
+.so-wh-itemid{font-family:monospace;font-weight:600;color:#E65100}
+.so-wh-num{text-align:right;font-variant-numeric:tabular-nums}
+.so-wh-ready-btn{background:#43A047;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.so-wh-ready-btn:hover{background:#2E7D32}
+.so-wh-ready-btn.so-wh-done{background:#90A4AE;cursor:default}
 
 /* ===== Design Mode (toggle via 🛠 Design button) =====
    When body.design-mode is on, every element with [data-region] or [id]
@@ -647,13 +661,13 @@ header{display:none!important}
   <span id="loadingText">Syncing from Google Sheets...</span>
 </div>
 
-<div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
+<div class="sync-indicator" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
-  <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
+  <span class="sync-txt" id="syncIndicatorText">Synced in 11.6s (partial: yardsreceived, salesorders, beginning, withdrawals, yardswithdrawn, received, itemcode, partialrolls)</span>
+  <span class="sync-progress" id="syncIndicatorProgress"></span>
 </div>
 
-<div class="toast" id="toast">Synced in 6.1s (partial: received, salesorders, yardsreceived, beginning, yardswithdrawn, withdrawals, partialrolls, itemcode)</div>
+<div class="toast" id="toast">Synced in 11.6s (partial: yardsreceived, salesorders, beginning, withdrawals, yardswithdrawn, received, itemcode, partialrolls)</div>
 
 <div class="app-shell">
 
@@ -680,7 +694,7 @@ header{display:none!important}
   </nav>
 
   <div class="sidebar-footer">
-    <button class="sidebar-footer-btn loading" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">Syncing...</button>
+    <button class="sidebar-footer-btn" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">Sync Now</button>
     <button class="sidebar-footer-btn" id="settingsBtn" onclick="openSettingsWithPin()" title="Show setup / config panel — protected by 4-digit PIN">⚙ Settings 🔒</button>
     <button class="sidebar-footer-btn" id="designModeBtn" onclick="openDesignModeWithPin()" title="Design Mode — click to label every UI region with a codename">🛠 Design 🔒</button>
     <div class="sidebar-user">
@@ -9098,45 +9112,57 @@ function renderSalesOrders() {
     return tb - ta;
   });
 
-  if (badge) badge.textContent = orders.length + ' order' + (orders.length===1?'':'s');
+  if (badge) badge.textContent = orders.length + ' row' + (orders.length===1?'':'s');
 
   if (!orders.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🍔</div><div class="empty-text">No sales orders match — click ↻ Refresh to re-pull from JHONG BACKEND.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No matching orders — click ↻ Refresh to re-pull from JHONG BACKEND.</div></div>';
     return;
   }
 
-  var html = '';
-  orders.forEach(function(o, idx){
-    var totalQty = o.items.reduce(function(s,it){ return s + (parseFloat(it.qty)||0); }, 0);
+  var html = '<table class="so-wh-table">'
+    + '<thead><tr>'
+    + '<th>Date</th>'
+    + '<th>Job Order</th>'
+    + '<th>Item ID</th>'
+    + '<th>Item Description</th>'
+    + '<th>W</th>'
+    + '<th>L</th>'
+    + '<th>Qty</th>'
+    + '<th>Unit</th>'
+    + '<th>Customer</th>'
+    + '<th>Status</th>'
+    + '<th>Sales</th>'
+    + '<th>Action</th>'
+    + '</tr></thead><tbody>';
+
+  orders.forEach(function(o){
     var statusKey = (o.status || 'pending').toLowerCase();
     var statusPill = '<span class="so-status-pill so-status-'+escAttr(statusKey)+'">'+escapeHtml(statusKey)+'</span>';
-    var newest = idx === 0 ? ' is-newest' : '';
-    html += '<div class="so-strip'+newest+'">'
-         +    '<div class="so-strip-info">'
-         +      '<span class="so-no">'+escapeHtml(o.orderNo || o.id || '—')+'</span>'
-         +      '<span class="so-when">'+escapeHtml((o.date||'')+(o.time?' · '+o.time:''))+'</span>'
-         +      '<span class="so-cust">👤 '+escapeHtml(o.customer || '(walk-in)')+'</span>'
-         +      (o.remarks ? '<span class="so-rem">📝 '+escapeHtml(o.remarks)+'</span>' : '')
-         +      statusPill
-         +      '<span class="so-meta">'+o.items.length+' item'+(o.items.length===1?'':'s')+' · total qty '+totalQty+'</span>'
-         +    '</div>'
-         +    '<div class="so-strip-items">';
-    o.items.forEach(function(li){
-      // Look up description from ITEMCODE if missing
-      var matched = STATE.items.find(function(it){ return String(it.code).trim() === String(li.code).trim(); });
-      var desc = li.desc || (matched && matched.desc) || '';
-      var size = li.size || (matched && matched.size) || '';
-      html += '<div class="so-item-chip">'
-           +    '<span class="chip-code">'+escapeHtml(li.code)+'</span>'
-           +    '<span class="chip-desc">'+escapeHtml(desc || '—')+'</span>'
-           +    (size ? '<span class="chip-size">'+escapeHtml(size)+'</span>' : '')
-           +    '<span class="chip-qty">×'+(parseFloat(li.qty)||0)+'</span>'
-           +  '</div>';
-    });
-    html += '    </div>';
-    html += '  </div>';
+    html += '<tr>'
+      + '<td>'+escapeHtml(o.date||'—')+'</td>'
+      + '<td class="so-wh-joborder">'+escapeHtml(o.orderNo||'—')+'</td>'
+      + '<td class="so-wh-itemid">'+escapeHtml(o.soItemCode||'—')+'</td>'
+      + '<td>'+escapeHtml(o.soItemDesc||'—')+'</td>'
+      + '<td class="so-wh-num">'+escapeHtml(o.soW||'—')+'</td>'
+      + '<td class="so-wh-num">'+escapeHtml(o.soL||'—')+'</td>'
+      + '<td class="so-wh-num">'+escapeHtml(o.soQty||'—')+'</td>'
+      + '<td>'+escapeHtml(o.soUnit||'—')+'</td>'
+      + '<td>'+escapeHtml(o.customer||'—')+'</td>'
+      + '<td>'+statusPill+'</td>'
+      + '<td>'+escapeHtml(o.soSales||'—')+'</td>'
+      + '<td><button class="btn-ready so-wh-ready-btn" data-id="'+escAttr(o.id||'')+'" onclick="soWhReady(this)">'
+      + '✔ Ready</button></td>'
+      + '</tr>';
   });
+
+  html += '</tbody></table>';
   list.innerHTML = html;
+}
+
+function soWhReady(btn) {
+  btn.disabled = true;
+  btn.textContent = '✔ Done';
+  btn.classList.add('so-wh-done');
 }
 
 function _orderTs(o) {
@@ -9166,8 +9192,20 @@ function parseSalesOrderRows(rows) {
       iSize  = colAny(['size','unit']),
       iQty   = colAny(['qty','quantity']),
       iStat  = colAny(['status','state']),
-      iDel   = colAny(['deleted']),
-      iSoItemCode = 17; // Column R (0-based index 17) — item code scanned for warehouse display
+      iDel   = colAny(['deleted']);
+
+  // Fixed column positions (0-based) for the warehouse display table
+  var COL_DATE     = 0,  // Column A
+      COL_JOBORDER = 2,  // Column C
+      COL_CUSTOMER = 5,  // Column F
+      COL_SALES    = 7,  // Column H
+      COL_STATUS   = 10, // Column K
+      COL_QTY      = 11, // Column L
+      COL_UNIT     = 12, // Column M
+      COL_W        = 13, // Column N
+      COL_L        = 15, // Column P
+      COL_ITEMID   = 17, // Column R
+      COL_ITEMDESC = 18; // Column S
 
   // Format A: order-per-row with JSON items column
   if (iItems !== -1) {
@@ -9191,14 +9229,20 @@ function parseSalesOrderRows(rows) {
       }
       out.push({
         id: id,
-        date: iDate>=0 ? formatRawDate(String(r[iDate]||'')) : '',
+        date: formatRawDate(String(r[COL_DATE]||'')),
         time: iTime>=0 ? String(r[iTime]||'').trim() : '',
-        orderNo: iNo>=0 ? String(r[iNo]||'').trim() : '',
-        customer: iCust>=0 ? String(r[iCust]||'').trim() : '',
+        orderNo: String(r[COL_JOBORDER]||'').trim(),
+        customer: String(r[COL_CUSTOMER]||'').trim(),
         remarks: iRem>=0 ? String(r[iRem]||'').trim() : '',
         items: Array.isArray(items) ? items : [],
-        status: iStat>=0 ? (String(r[iStat]||'').trim().toLowerCase() || 'pending') : 'pending',
-        soItemCode: String(r[iSoItemCode]||'').trim(), // Column R — item code for warehouse filter
+        status: String(r[COL_STATUS]||'').trim().toLowerCase() || 'pending',
+        soItemCode: String(r[COL_ITEMID]||'').trim(),
+        soItemDesc: String(r[COL_ITEMDESC]||'').trim(),
+        soW:        String(r[COL_W]||'').trim(),
+        soL:        String(r[COL_L]||'').trim(),
+        soQty:      String(r[COL_QTY]||'').trim(),
+        soUnit:     String(r[COL_UNIT]||'').trim(),
+        soSales:    String(r[COL_SALES]||'').trim(),
         source: 'backend'
       });
     }
@@ -9213,12 +9257,12 @@ function parseSalesOrderRows(rows) {
       var r2 = rows[j];
       var code = String(r2[iCode]||'').trim();
       if (!code) continue;
-      var no = iNo>=0 ? String(r2[iNo]||'').trim() : '';
-      var date = iDate>=0 ? formatRawDate(String(r2[iDate]||'')) : '';
+      var no = String(r2[COL_JOBORDER]||'').trim();
+      var date = formatRawDate(String(r2[COL_DATE]||''));
       var time = iTime>=0 ? String(r2[iTime]||'').trim() : '';
-      var cust = iCust>=0 ? String(r2[iCust]||'').trim() : '';
+      var cust = String(r2[COL_CUSTOMER]||'').trim();
       var rem  = iRem>=0  ? String(r2[iRem]||'').trim()  : '';
-      var stat = iStat>=0 ? (String(r2[iStat]||'').trim().toLowerCase() || 'pending') : 'pending';
+      var stat = String(r2[COL_STATUS]||'').trim().toLowerCase() || 'pending';
       var groupKey = no || (date + '|' + cust + '|' + j);
       var oid = iId>=0 ? String(r2[iId]||'').trim() : '';
       if (!oid) oid = 'so_' + (groupKey || j).replace(/\s+/g,'_');
@@ -9233,7 +9277,13 @@ function parseSalesOrderRows(rows) {
           remarks: rem,
           items: [],
           status: stat,
-          soItemCode: String(r2[iSoItemCode]||'').trim(), // Column R — item code for warehouse filter
+          soItemCode: String(r2[COL_ITEMID]||'').trim(),
+          soItemDesc: String(r2[COL_ITEMDESC]||'').trim(),
+          soW:        String(r2[COL_W]||'').trim(),
+          soL:        String(r2[COL_L]||'').trim(),
+          soQty:      String(r2[COL_QTY]||'').trim(),
+          soUnit:     String(r2[COL_UNIT]||'').trim(),
+          soSales:    String(r2[COL_SALES]||'').trim(),
           source: 'backend',
           _rowIdx: j
         };
