@@ -2187,20 +2187,46 @@ function syncNow(opts) {
     );
   }));
 
-  // ── YARDSWITHDRAWN → STATE.threeMYardsWithdrawals ──────────────────
+  // ── YARDSWITHDRAWN → STATE.threeMYardsWithdrawals ────────────────────
   // Reads the YARDSWITHDRAWN sheet so the "Withdraw Yards" sub-tab is
   // consistent across ALL devices, not just the one that made the entries.
-  // Also used below to recompute roll.withdrawn from the live log.
   total++;
-  jobs.push(new Promise(function(resolve){\r\n    var _settledYwd = false;\r\n    function _finishYwd() { if (_settledYwd) return; _settledYwd = true; bumpProg(); resolve(); }\r\n    var _guardYwd = setTimeout(function(){\r\n      if (!_settledYwd) { console.warn('read_yardswithdrawn: timed out'); failed.push('yardswithdrawn'); _finishYwd(); }\r\n    }, 12000);\r\n    if (!STATE.config.proxyUrl) { clearTimeout(_guardYwd); _finishYwd(); return; }\r\n    fetchFromAppsScript('read_yardswithdrawn',\r\n      function(rows){\r\n        clearTimeout(_guardYwd);\r\n        var parsed = parseYardsWithdrawnRows(rows || []);\r\n        // Only replace local state when the backend has something useful,\r\n        // or is genuinely empty (header-only). Guard against column-name\r\n        // mismatches silently wiping existing local entries.\r\n        var backendHasDataRows = (rows || []).length > 1;\r\n        if (parsed.length > 0 || !backendHasDataRows) {\r\n          STATE.threeMYardsWithdrawals = parsed;\r\n        } else {\r\n          console.warn('read_yardswithdrawn: backend returned', (rows||[]).length-1,\r\n            'rows but parser yielded 0 — keeping local state. Check YARDSWITHDRAWN sheet headers.');\r\n        }\r\n        try { renderTmyWithdrawals(); } catch(e){}\r\n        _finishYwd();\r\n      },\r\n      function(err){\r\n        clearTimeout(_guardYwd);\r\n        console.warn('read_yardswithdrawn:', err);\r\n        failed.push('yardswithdrawn');\r\n        _finishYwd();\r\n      }\r\n    );\r\n  }));
+  jobs.push(new Promise(function(resolve){
+    var _settledYwd = false;
+    function _finishYwd() { if (_settledYwd) return; _settledYwd = true; bumpProg(); resolve(); }
+    var _guardYwd = setTimeout(function(){
+      if (!_settledYwd) { console.warn('read_yardswithdrawn: timed out'); failed.push('yardswithdrawn'); _finishYwd(); }
+    }, 12000);
+    if (!STATE.config.proxyUrl) { clearTimeout(_guardYwd); _finishYwd(); return; }
+    fetchFromAppsScript('read_yardswithdrawn',
+      function(rows){
+        clearTimeout(_guardYwd);
+        var parsed = parseYardsWithdrawnRows(rows || []);
+        var backendHasDataRows = (rows || []).length > 1;
+        if (parsed.length > 0 || !backendHasDataRows) {
+          STATE.threeMYardsWithdrawals = parsed;
+        } else {
+          console.warn('read_yardswithdrawn: backend returned', (rows||[]).length-1,
+            'rows but parser yielded 0 — keeping local state. Check YARDSWITHDRAWN headers.');
+        }
+        try { renderTmyWithdrawals(); } catch(e){}
+        _finishYwd();
+      },
+      function(err){
+        clearTimeout(_guardYwd);
+        console.warn('read_yardswithdrawn:', err);
+        failed.push('yardswithdrawn');
+        _finishYwd();
+      }
+    );
+  }));
 
   Promise.all(jobs).then(function(){
     _syncInFlight = false;
     if (btn) { btn.textContent = 'Sync Now'; btn.classList.remove('loading'); }
     STATE.lastSync = new Date().toISOString();
-    // Recompute each roll's withdrawn total from the live withdrawal log so
-    // the Yards Stock balance is accurate on any device, not just the one
-    // that made the entries.
+    // Recompute each roll's withdrawn total from the live log so
+    // Yards Stock balance is accurate on any device.
     (function recomputeWithdrawn(){
       var log = STATE.threeMYardsWithdrawals || [];
       var wdMap = {};
@@ -2467,7 +2493,7 @@ function parseYardsReceivedRows(rows) {
 }
 
 // Parses rows from the YARDSWITHDRAWN sheet.
-// YARDSWITHDRAWN_HEADER: [Date(0), CoreNo(1), ItemID(2), Yards(3), Ref(4), Note(5), ID(6), Deleted(7), DeletedAt(8), DeletedBy(9)]
+// YARDSWITHDRAWN_HEADER: [Date(0),CoreNo(1),ItemID(2),Yards(3),Ref(4),Note(5),ID(6),Deleted(7)]
 function parseYardsWithdrawnRows(rows) {
   if (!rows || rows.length < 2) return [];
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
