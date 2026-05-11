@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0044)file:///C:/Users/Lisa/Downloads/index_1.html -->
+<!-- saved from url=(0044)file:///C:/Users/Lisa/Downloads/index_2.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -663,11 +663,11 @@ header{display:none!important}
 
 <div class="sync-indicator" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
-  <span class="sync-txt" id="syncIndicatorText">Synced in 1.6s (partial: withdrawals, received, beginning, salesorders, itemcode, partialrolls)</span>
+  <span class="sync-txt" id="syncIndicatorText">Synced in 2.1s (partial: withdrawals, received, beginning, salesorders, partialrolls, itemcode)</span>
   <span class="sync-progress" id="syncIndicatorProgress"></span>
 </div>
 
-<div class="toast" id="toast">Synced in 1.6s (partial: withdrawals, received, beginning, salesorders, itemcode, partialrolls)</div>
+<div class="toast" id="toast">Synced in 2.1s (partial: withdrawals, received, beginning, salesorders, partialrolls, itemcode)</div>
 
 <div class="app-shell">
 
@@ -1009,7 +1009,12 @@ header{display:none!important}
         <div class="card">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Date</th><th>Item Code</th><th>Description</th><th>Size</th><th>Qty</th><th>Withdrawal No.</th><th>Customer</th><th>Remarks</th><th style="width:90px">Action</th></tr></thead>
+              <thead><tr>
+                <th id="hThDate" ondblclick="toggleHistorySort(&#39;date&#39;)" style="cursor:pointer;user-select:none" title="Double-click to sort by Date">Date <span id="hSortIconDate" style="font-size:10px;opacity:0.5"></span></th>
+                <th>Item Code</th><th>Description</th><th>Size</th><th>Qty</th>
+                <th id="hThWhdl" ondblclick="toggleHistorySort(&#39;whdl&#39;)" style="cursor:pointer;user-select:none" title="Double-click to sort by Withdrawal No.">Withdrawal No. <span id="hSortIconWhdl" style="font-size:10px;opacity:0.5"></span></th>
+                <th>Customer</th><th>Remarks</th><th style="width:90px">Action</th>
+              </tr></thead>
               <tbody id="historyBody"><tr><td colspan="9"><div class="empty-state"><div class="empty-icon">⏷</div><div class="empty-text">No withdrawal records found.</div></div></td></tr></tbody>
             </table>
           </div>
@@ -3495,6 +3500,34 @@ function deleteWithdrawal(id) {
 }
 
 // ---------- HISTORY ----------
+function toggleHistorySort(col) {
+  if (!STATE._hSortCol || STATE._hSortCol !== col) {
+    STATE._hSortCol = col;
+    STATE._hSortDir = 'desc';
+  } else {
+    STATE._hSortDir = STATE._hSortDir === 'desc' ? 'asc' : 'desc';
+  }
+  STATE.hPage = 1;
+  // Update header visuals
+  var iconDate = document.getElementById('hSortIconDate');
+  var iconWhdl = document.getElementById('hSortIconWhdl');
+  var thDate   = document.getElementById('hThDate');
+  var thWhdl   = document.getElementById('hThWhdl');
+  if (iconDate) iconDate.textContent = '';
+  if (iconWhdl) iconWhdl.textContent = '';
+  if (thDate)   thDate.style.background   = '';
+  if (thWhdl)   thWhdl.style.background   = '';
+  var arrow = STATE._hSortDir === 'asc' ? ' ▲' : ' ▼';
+  if (col === 'date' && iconDate) {
+    iconDate.textContent = arrow;
+    if (thDate) thDate.style.background = '#D7F0DA';
+  } else if (col === 'whdl' && iconWhdl) {
+    iconWhdl.textContent = arrow;
+    if (thWhdl) thWhdl.style.background = '#D7F0DA';
+  }
+  renderHistory();
+}
+
 function renderHistory() {
   var body = document.getElementById('historyBody');
   var q = (document.getElementById('hFilter')   ? document.getElementById('hFilter').value   : '').toLowerCase().trim();
@@ -3521,18 +3554,42 @@ function renderHistory() {
     return true;
   });
 
-  // Sort by withdrawal number descending (numeric), then date descending
-  filtered.sort(function(a, b){
-    var ma = (a.withdrawalNo||'').match(/(\d+)\s*$/);
-    var mb = (b.withdrawalNo||'').match(/(\d+)\s*$/);
-    var na = ma ? parseInt(ma[1], 10) : -1;
-    var nb = mb ? parseInt(mb[1], 10) : -1;
-    if (na !== nb) return nb - na;
-    var da = Date.parse(a.date), db = Date.parse(b.date);
-    if (isNaN(da)) return 1;
-    if (isNaN(db)) return -1;
-    return db - da;
-  });
+  // Sort: if user double-clicked a column header, use that; else default (withdrawal no. desc, date desc)
+  var sc = STATE._hSortCol, sd = STATE._hSortDir; // col: 'date'|'whdl', dir: 'asc'|'desc'
+  if (sc === 'date') {
+    filtered.sort(function(a, b){
+      var da = Date.parse(a.date), db = Date.parse(b.date);
+      if (isNaN(da) && isNaN(db)) return 0;
+      if (isNaN(da)) return 1;
+      if (isNaN(db)) return -1;
+      return sd === 'asc' ? da - db : db - da;
+    });
+  } else if (sc === 'whdl') {
+    filtered.sort(function(a, b){
+      var ma = (a.withdrawalNo||'').match(/(\d+)\s*$/);
+      var mb = (b.withdrawalNo||'').match(/(\d+)\s*$/);
+      var na = ma ? parseInt(ma[1], 10) : -1;
+      var nb = mb ? parseInt(mb[1], 10) : -1;
+      if (na !== nb) return sd === 'asc' ? na - nb : nb - na;
+      var da = Date.parse(a.date), db = Date.parse(b.date);
+      if (isNaN(da)) return 1;
+      if (isNaN(db)) return -1;
+      return db - da;
+    });
+  } else {
+    // Default sort: withdrawal number desc, then date desc
+    filtered.sort(function(a, b){
+      var ma = (a.withdrawalNo||'').match(/(\d+)\s*$/);
+      var mb = (b.withdrawalNo||'').match(/(\d+)\s*$/);
+      var na = ma ? parseInt(ma[1], 10) : -1;
+      var nb = mb ? parseInt(mb[1], 10) : -1;
+      if (na !== nb) return nb - na;
+      var da = Date.parse(a.date), db = Date.parse(b.date);
+      if (isNaN(da)) return 1;
+      if (isNaN(db)) return -1;
+      return db - da;
+    });
+  }
 
   var total = filtered.length;
   if (!total) {
