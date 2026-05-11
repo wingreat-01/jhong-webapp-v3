@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_16.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_17.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -4512,11 +4512,7 @@ function deleteTmyWithdrawal(id) {
   renderTmyWithdrawals();
   render3MYards();
   // Delete from YARDSWITHDRAWN sheet in JHONG BACKEND
-  // Also send coreNo/ref/yards as fallback keys for legacy rows where the
-  // sheet's ID column (H) was blank — those get a synthetic ywd_legacy_rN id
-  // that was never written to the sheet, so the backend needs another way to
-  // identify the row.
-  postToScript({action:'delete_yardswithdrawn', id: id, coreNo: entry.coreNo, ref: entry.ref, yards: entry.yards},
+  postToScript({action:'delete_yardswithdrawn', id: id},
     function(){ /* deleted */ },
     function(err){ showToast('Deleted locally — YARDSWITHDRAWN sheet delete failed: '+err, 'error'); }
   );
@@ -5308,24 +5304,38 @@ function _renderTmyWdRefAC(v, list) {
   el.classList.add('show');
 }
 
+
 function pickTmyWdRef(no, customer) {
   var refEl = document.getElementById('tmyWdRef');
   if (refEl) refEl.value = no;
   hideTmyWdRefAC();
-  // Auto-fill Customer field from the selected ref's customer, same as Withdrawal tab
   var custEl = document.getElementById('tmyWdCustomer');
   if (custEl && customer && customer.trim()) {
     custEl.value = customer.trim();
     custEl.style.transition = 'background 0.3s';
     custEl.style.background = '#E8F5E9';
     setTimeout(function() { custEl.style.background = ''; }, 800);
-    var nextEl = document.getElementById('tmyWdYards');
-    if (nextEl) nextEl.focus();
-  } else {
-    var fallbackEl = document.getElementById('tmyWdCustomer');
-    if (fallbackEl) fallbackEl.focus();
   }
+  var submitBtn = document.getElementById('tmyWdSubmitBtn');
+  if (submitBtn) submitBtn.focus();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function hideTmyWdRefAC() {
   var el = document.getElementById('tmyWdRefAcList');
