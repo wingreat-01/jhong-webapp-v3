@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_30.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_31.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -2080,7 +2080,7 @@ function syncNow(opts) {
   jobs.push(new Promise(function(resolve){
     fetchFromAppsScript('read_codemap',
       function(rows){
-        // rows is [{code,desc}] from CODEMAP col A+B
+        // rows = [{code,desc}] from CODEMAP col A (code) + col B (desc)
         if (Array.isArray(rows) && rows.length) {
           STATE.codemapCodes = rows;
           try { filterSalesOrderGsheet(); } catch(e){}
@@ -6491,7 +6491,7 @@ var URL_CACHE_TTL_MS = 30000;
 // paginated table. Adapted from YMCC's withdrawal-records-from-gsheet.
 // ============================================================
 
-// SALESORDER CSV column layout — matches the published GSheet tab header exactly:
+// SALESORDER CSV columns match the published GSheet tab header exactly:
 // A=0 Date | B=1 Job Order | C=2 Item ID | D=3 Item Description
 // E=4 W | F=5 L | G=6 Qty | H=7 Unit | I=8 Customer | J=9 Status | K=10 Sales
 var SO_GS_ITEMID_COL = 2; // Col C
@@ -6764,7 +6764,7 @@ function loadSalesOrderGsheet() {
 }
 
 // Build a case-insensitive lookup of valid item codes from STATE.items.
-// Returns {lowerCode: desc} for every entry in CODEMAP.
+// Returns {lowerCode: desc} for every CODEMAP entry.
 function _soGsValidCodeSet() {
   var set = {};
   (STATE.codemapCodes || []).forEach(function(entry) {
@@ -6773,6 +6773,29 @@ function _soGsValidCodeSet() {
     if (code) set[code.toLowerCase()] = desc;
   });
   return set;
+}
+
+// Robustly parse a date string from the SALESORDER CSV into a ms timestamp.
+// Handles: YYYY-MM-DD, M/D/YYYY, D/M/YYYY, Google Sheets serial numbers, ISO strings.
+// Returns null if the date cannot be parsed.
+function _parseSoDateMs(raw) {
+  if (!raw) return null;
+  raw = String(raw).trim();
+  if (!raw) return null;
+  // YYYY-MM-DD (ISO date, no timezone shift)
+  var m1 = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m1) return new Date(+m1[1], +m1[2]-1, +m1[3]).getTime();
+  // M/D/YYYY or MM/DD/YYYY (US format from Google Sheets en-US locale)
+  var m2 = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m2) return new Date(+m2[3], +m2[1]-1, +m2[2]).getTime();
+  // Google Sheets date serial number (days since Dec 30 1899)
+  var serial = parseFloat(raw);
+  if (!isNaN(serial) && serial > 1 && serial < 100000) {
+    return new Date(Date.UTC(1899,11,30) + serial*86400000).getTime();
+  }
+  // Fallback: let the browser try
+  var t = Date.parse(raw);
+  return isNaN(t) ? null : t;
 }
 
 function parseSalesOrderGsheetCSV(csvText) {
@@ -6810,11 +6833,11 @@ function parseSalesOrderGsheetCSV(csvText) {
     if (!lines[r].trim()) continue;
     var cols = parseCSVLine(lines[r]);
 
-    // ITEM ID lives in column R (idx 17). Skip rows without it.
+    // Item ID is in Col C (idx 2).
     var itemId = String(cols[SO_GS_ITEMID_COL] || '').trim();
     if (!itemId) continue;
 
-    // Only keep rows whose ITEM ID is in the CODEMAP whitelist.
+    // Only keep rows whose Item ID is in the CODEMAP whitelist.
     if (!(itemId.toLowerCase() in validSet)) continue;
 
     var rawDate = String(cols[dateIdx] || '').trim();
@@ -6822,7 +6845,7 @@ function parseSalesOrderGsheetCSV(csvText) {
       cols: cols,
       _itemId: itemId,
       _date: rawDate,
-      _dateMs: (function(){ var t = Date.parse(rawDate); return isNaN(t) ? null : t; })()
+      _dateMs: _parseSoDateMs(rawDate)
     });
   }
   // Sort newest first by date (rows with unparseable dates sink to the bottom).
@@ -6861,7 +6884,7 @@ function filterSalesOrderGsheet() {
       }
       if (!hit) return false;
     }
-    if (frMs !== null && (row._dateMs === null || row._dateMs < frMs)) return false;
+    if (frMs !== null && row._dateMs !== null && row._dateMs < frMs) return false;
     if (toMs !== null && (row._dateMs === null || row._dateMs > toMs)) return false;
     return true;
   });
@@ -7214,7 +7237,7 @@ function _soGsRenderCell(spec, row) {
       styleParts.push('font-family:monospace');
       break;
     case 'itemdesc':
-      // Look up description from CODEMAP by Item ID.
+      // Look up description from CODEMAP by Item ID (col C, idx 2).
       var idLookup = String((row.cols && row.cols[SO_GS_ITEMID_COL]) || '').trim();
       var idLookupKey = idLookup.toLowerCase();
       var cmEntry = idLookupKey
