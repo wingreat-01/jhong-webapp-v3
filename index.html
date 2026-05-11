@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_28.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_29.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -664,7 +664,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
+  <span class="sync-progress" id="syncIndicatorProgress">9/10</span>
 </div>
 
 <div class="toast" id="toast">Synced in 6.1s (partial: received, salesorders, yardsreceived, beginning, yardswithdrawn, withdrawals, partialrolls, itemcode)</div>
@@ -1833,7 +1833,7 @@ var STATE = {
   received: [],
   beginning: {},        // map: ITEMCODE -> {qty, notes, source}
   salesOrders: [],      // list of orders {id,date,time,orderNo,customer,remarks,items:[{code,desc,qty}],status,source}
-  codemapCodes: [],     // flat array of valid item codes from CODEMAP column C
+  codemapCodes: [],     // [{code, desc}] from CODEMAP columns A (code) B (description)
   config: {proxyUrl: (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : DEFAULT_PROXY_URL), itemcodeCsvUrl: DEFAULT_ITEMCODE_CSV_URL, salesOrderCsvUrl:DEFAULT_SALESORDER_CSV_URL, beginningPin: '1234', userPin:'1234', adminPin:'7777'},
   lastSync: null,
   hPage: 1,
@@ -6491,41 +6491,31 @@ var URL_CACHE_TTL_MS = 30000;
 // paginated table. Adapted from YMCC's withdrawal-records-from-gsheet.
 // ============================================================
 
-// SALESORDER CSV column layout (0-based), matching the published GSheet tab:
-// Col A=0  Date
-// Col B=1  Job Order
-// Col C=2  Item ID
-// Col D=3  Item Description
-// Col E=4  W
-// Col F=5  L
-// Col G=6  Qty
-// Col H=7  Unit
-// Col I=8  Customer
-// Col J=9  Status
-// Col K=10 Sales
-// (Action is local-only, no CSV column)
-var SO_GS_ITEMID_COL = 2;
+// SALESORDER tab column R is "ITEM ID" — A=0, B=1 ... R=17
+var SO_GS_ITEMID_COL = 17;
 
-// Display spec — idx must match the column positions above.
+// Fixed display spec: only these columns are shown, in this order.
+// `idx` is the 0-based source column from the SALESORDER CSV.
+//   A=0 B=1 C=2 D=3 E=4 F=5 G=6 H=7 I=8 J=9 K=10 L=11 M=12 N=13 O=14 P=15 Q=16 R=17
 var SO_GS_COLUMNS = [
-  {label: 'Date',             idx: 0, type: 'date'},
-  {label: 'Job Order',        idx: 1},
-  {label: 'Item ID',          idx: 2, type: 'itemid'},
-  {label: 'Item Description', idx: 3},
-  {label: 'W',                idx: 4, align: 'right'},
-  {label: 'L',                idx: 5, align: 'right'},
-  {label: 'Qty',              idx: 6, align: 'right', strong: true},
-  {label: 'Unit',             idx: 7},
-  {label: 'Customer',         idx: 8},
-  {label: 'Status',           idx: 9, type: 'status'},
-  {label: 'Sales',            idx: 10},
-  {label: 'Action',           type: 'ready'}
+  {label: 'Date',      idx: 0,  type: 'date'},                            // Col A
+  {label: 'Job Order', idx: 2},                                            // Col C
+  {label: 'Item ID',   idx: 17, type: 'itemid'},                           // Col R
+  {label: 'Item Description', type: 'itemdesc'},                          // resolved from ITEMCODE
+  {label: 'W',         idx: 13, align: 'right', unitIdx: 14},               // Col N + unit O
+  {label: 'L',         idx: 15, align: 'right', unitIdx: 16},               // Col P + unit Q
+  {label: 'Qty',       idx: 11, align: 'right', strong: true},             // Col L
+  {label: 'Unit',      idx: 12},                                            // Col M
+  {label: 'Customer',  idx: 5},                                            // Col F
+  {label: 'Status',    idx: 10, type: 'status'},                           // Col K
+  {label: 'Sales',     idx: 7},                                            // Col H
+  {label: 'Action',    type: 'ready'}                                      // local-only Ready button
 ];
 
 // Stable key per row for the local "Ready" tracker. Job Order + Item ID
 // uniquely identifies a line within an order (one Job Order can have many items).
 function _soGsRowKey(row) {
-  var jo = String(row.cols[1] || '').trim();  // Col B = Job Order (idx 1)
+  var jo = String(row.cols[2] || '').trim();
   var id = String(row._itemId || '').trim();
   return (jo + '||' + id).toLowerCase();
 }
@@ -6775,13 +6765,17 @@ function loadSalesOrderGsheet() {
 }
 
 // Build a case-insensitive lookup of valid item codes from STATE.items.
+// Returns {lowerCaseCode -> desc} for all CODEMAP entries.
 function _soGsValidCodeSet() {
   var set = {};
-  // Use CODEMAP column C as the whitelist; fall back to ITEMCODE if not loaded yet.
   var src = (STATE.codemapCodes && STATE.codemapCodes.length)
     ? STATE.codemapCodes
-    : (STATE.items || []).map(function(it){ return it && it.code ? String(it.code) : ''; });
-  src.forEach(function(c){ if (c) set[String(c).trim().toLowerCase()] = 1; });
+    : [];
+  src.forEach(function(entry){
+    var code = String(entry && entry.code ? entry.code : entry).trim();
+    var desc = (entry && entry.desc) ? String(entry.desc).trim() : '';
+    if (code) set[code.toLowerCase()] = desc;
+  });
   return set;
 }
 
@@ -6824,8 +6818,8 @@ function parseSalesOrderGsheetCSV(csvText) {
     var itemId = String(cols[SO_GS_ITEMID_COL] || '').trim();
     if (!itemId) continue;
 
-    // Only keep rows whose ITEM ID matches an ITEMCODE entry.
-    if (!validSet[itemId.toLowerCase()]) continue;
+    // Only keep rows whose ITEM ID is in the CODEMAP whitelist.
+    if (!(itemId.toLowerCase() in validSet)) continue;
 
     var rawDate = String(cols[dateIdx] || '').trim();
     kept.push({
@@ -6946,17 +6940,17 @@ function markSoGsRowServed(rowKey) {
   var rec = {
     id: 'srv_'+Date.now()+'_'+Math.random().toString(36).substr(2,5),
     rowKey: rowKey,
-    date: col(0),   // Col A
-    jobOrder: col(1),   // Col B
-    itemId: src._itemId || col(2),  // Col C
-    width: col(4),  // Col E
-    length: col(5), // Col F
-    qty: parseFloat(col(6)) || 0,   // Col G
-    unit: col(7),   // Col H
-    customer: col(8),   // Col I
-    urgency: '',
-    status: col(9), // Col J
-    sales: col(10), // Col K
+    date: col(0),
+    jobOrder: col(2),
+    itemId: src._itemId || col(17),
+    width: col(13),
+    length: col(15),
+    qty: parseFloat(col(11)) || 0,
+    unit: col(12),
+    customer: col(5),
+    urgency: col(9),
+    status: col(10),
+    sales: col(7),
     servedAt: new Date().toISOString(),
     source: 'pending'
   };
@@ -7224,15 +7218,17 @@ function _soGsRenderCell(spec, row) {
       styleParts.push('font-family:monospace');
       break;
     case 'itemdesc':
-      // Look up the matching ITEMCODE entry by Item ID (column R / idx 17 in
-      // the source CSV). Falls back to '—' when the row has no ID, or when
-      // the ID isn't in STATE.items, or when the matched item has no desc.
+      // Look up description from CODEMAP (STATE.codemapCodes) by Item ID.
       var idLookup = String((row.cols && row.cols[SO_GS_ITEMID_COL]) || '').trim();
       var idLookupKey = idLookup.toLowerCase();
-      var descMatch = idLookupKey
-        ? (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === idLookupKey; })
-        : null;
-      content = (descMatch && descMatch.desc) ? escapeHtml(descMatch.desc) : '—';
+      var codemapDesc = '';
+      if (idLookupKey) {
+        var cmEntry = (STATE.codemapCodes || []).find(function(e){
+          return String(e && e.code ? e.code : e).trim().toLowerCase() === idLookupKey;
+        });
+        codemapDesc = (cmEntry && cmEntry.desc) ? cmEntry.desc : '';
+      }
+      content = codemapDesc ? escapeHtml(codemapDesc) : '—';
       styleParts.push('color:#37474F');
       break;
     case 'urgency':
@@ -9076,19 +9072,31 @@ function renderSalesOrders() {
   var fr = (document.getElementById('soFilterFrom') ? document.getElementById('soFilterFrom').value : '');
   var to = (document.getElementById('soFilterTo')   ? document.getElementById('soFilterTo').value   : '');
 
-  // Build set of valid item codes from CODEMAP column C
+  // Build {lowerCode -> desc} from CODEMAP for case-insensitive match
   var validCodes = {};
   if (STATE.codemapCodes && STATE.codemapCodes.length) {
-    STATE.codemapCodes.forEach(function(c){ if (c) validCodes[String(c).trim()] = 1; });
+    STATE.codemapCodes.forEach(function(entry){
+      var code = String(entry && entry.code ? entry.code : entry).trim();
+      var desc = (entry && entry.desc) ? String(entry.desc).trim() : '';
+      if (code) validCodes[code.toLowerCase()] = desc;
+    });
   }
 
-  // Filter orders by column R (soItemCode) against CODEMAP whitelist.
+  // Filter orders: pass if any line-item code is in the CODEMAP whitelist.
   // If CODEMAP hasn't loaded yet, show all orders so screen isn't blank.
   var hasCodes = Object.keys(validCodes).length > 0;
   var orders = (STATE.salesOrders || []).filter(function(o){
     if (!hasCodes) return true;
-    var code = String(o.soItemCode || '').trim();
-    return code && validCodes[code];
+    // soItemCode set for Format B (row-per-item) sheets
+    var direct = String(o.soItemCode || '').trim().toLowerCase();
+    if (direct && direct in validCodes) return true;
+    // items[] JSON for Format A (order-per-row) sheets
+    var its = Array.isArray(o.items) ? o.items : [];
+    for (var i = 0; i < its.length; i++) {
+      var c = String(its[i] && its[i].code || '').trim().toLowerCase();
+      if (c && c in validCodes) return true;
+    }
+    return false;
   });
 
   // Apply text filter

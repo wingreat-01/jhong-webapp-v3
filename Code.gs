@@ -106,7 +106,7 @@ function doGet(e) {
   }
 
   if (action === 'read_itemcode')      return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
-  if (action === 'read_codemap')       return _json({ok:true, codes: _getCodemapCodes()});
+  if (action === 'read_codemap')       return _json({ok:true, rows: _getCodemapCodes()});
   if (action === 'read_withdrawals')   return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
   if (action === 'read_received')      return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
   if (action === 'read_yardsreceived') return _json({ok:true, rows: _getYardsReceivedSheet().getDataRange().getValues()});
@@ -585,21 +585,22 @@ function _getItemcodeSheet() {
   if (!sh) throw new Error('ITEMCODE tab not found in JHONG BACKEND.');
   return sh;
 }
-// Returns a flat array of item code strings from CODEMAP column C (skips header row 1).
+// Returns array of {code, desc} from CODEMAP columns A (code) and B (description).
 function _getCodemapCodes() {
   var ss = _openSS();
   var sh = ss.getSheetByName(CODEMAP_TAB);
   if (!sh) return [];
   var lastRow = sh.getLastRow();
   if (lastRow < 2) return [];
-  // Column C = column index 3
-  var values = sh.getRange(2, 3, lastRow - 1, 1).getValues();
-  var codes = [];
+  // Columns A+B = columns 1 and 2
+  var values = sh.getRange(2, 1, lastRow - 1, 2).getValues();
+  var result = [];
   values.forEach(function(row) {
-    var v = String(row[0] || '').trim();
-    if (v) codes.push(v);
+    var code = String(row[0] || '').trim();
+    var desc = String(row[1] || '').trim();
+    if (code) result.push({code: code, desc: desc});
   });
-  return codes;
+  return result;
 }
 function _getWithdrawalSheet() {
   var ss = _openSS();
