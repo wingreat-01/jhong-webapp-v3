@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_12.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_13.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -5230,23 +5230,32 @@ function onTmyWdRefInput() {
   if (!v) { hideTmyWdRefAC(); return; }
   // Show from memory immediately
   _renderTmyWdRefAC(v, _tmyWdRefBuildList());
-  // Debounced live fetch
+  // Kick off live fetch — uses the same _whdlFetchLive / _whdlNoCached as the
+  // Withdrawal tab so customer data is always populated
   clearTimeout(_tmyWdRefDebounce);
   _tmyWdRefDebounce = setTimeout(function() { _tmyWdRefFetchLive(v); }, 300);
+  // If cache is cold, also trigger an immediate warm-up fetch
+  if (!_whdlNoCached || !_whdlNoCached.length) {
+    _whdlFetchLive(v);
+  }
 }
 
 function _tmyWdRefBuildList() {
-  // Pull unique order nos + customers from STATE.salesOrders and STATE.withdrawals
+  // Reuse the same combined list the Withdrawal tab builds — it already pulls
+  // from STATE.salesOrders, STATE.withdrawals, and the live SALESORDER CSV
+  // (cached in _whdlNoCached after the first Withdrawal-tab fetch).
+  // Also layer in any ref nos from STATE.threeMYardsWithdrawals.
+  var base = (_whdlNoCached && _whdlNoCached.length) ? _whdlNoCached : _whdlBuildFromState();
   var seen = {}, out = [];
-  (STATE.salesOrders || []).forEach(function(o) {
-    var no = (o.orderNo || '').trim();
-    var cust = (o.customer || '').trim();
+  base.forEach(function(m) {
+    var no = (m.no || '').trim();
     if (!no || seen[no]) return;
     seen[no] = true;
-    out.push({ no: no, customer: cust });
+    out.push({ no: no, customer: m.customer || '' });
   });
-  (STATE.withdrawals || []).forEach(function(w) {
-    var no = (w.withdrawalNo || '').trim();
+  // Also pick up any ref nos recorded in YARDSWITHDRAWN entries
+  (STATE.threeMYardsWithdrawals || []).forEach(function(w) {
+    var no = (w.ref || '').trim();
     var cust = (w.customer || '').trim();
     if (!no || seen[no]) return;
     seen[no] = true;
@@ -5256,56 +5265,17 @@ function _tmyWdRefBuildList() {
 }
 
 function _tmyWdRefFetchLive(typed) {
-  // Reuse the same published SALESORDER CSV as the Withdrawal No AC
-  var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSa1nCpmEPrAt1EB_7xW20MIlxJPXhqRY-hFpsx9x5gsvzmNv1sld8UQ7MSumaty0z_Ye8-bALyHg8Q/pub?gid=1859862657&single=true&output=csv';
-  function parseCSV(text) {
-    var rows = [], row = [], cur = '', inQ = false;
-    for (var i = 0; i < text.length; i++) {
-      var c = text[i];
-      if (inQ) {
-        if (c === '"' && text[i+1] === '"') { cur += '"'; i++; }
-        else if (c === '"') { inQ = false; }
-        else { cur += c; }
-      } else {
-        if (c === '"') { inQ = true; }
-        else if (c === ',') { row.push(cur); cur = ''; }
-        else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
-        else if (c !== '\r') { cur += c; }
-      }
+  // Trigger the same live CSV fetch the Withdrawal tab uses — result goes into
+  // _whdlNoCached so both ACs benefit from it. Then re-render the tmy dropdown.
+  _whdlFetchLive(typed);
+  // After a short delay (fetch is async), re-render with whatever is now cached
+  setTimeout(function() {
+    var refEl = document.getElementById('tmyWdRef');
+    if (refEl && document.activeElement === refEl) {
+      var cur = refEl.value.trim();
+      if (cur) _renderTmyWdRefAC(cur, _tmyWdRefBuildList());
     }
-    if (cur || row.length) { row.push(cur); rows.push(row); }
-    return rows;
-  }
-  fetch(CSV_URL, { cache: 'no-cache', redirect: 'follow' })
-    .then(function(r) { return r.text(); })
-    .then(function(csv) {
-      var rows = parseCSV(csv);
-      if (rows.length < 2) return;
-      var hdr = rows[0].map(function(h) { return String(h||'').trim().toLowerCase().replace(/[\s.#_]+/g,''); });
-      var iNo   = hdr.indexOf('orderno');   if (iNo   < 0) iNo   = 2;
-      var iCust = hdr.indexOf('customer');  if (iCust < 0) iCust = 5;
-      var iDel  = hdr.indexOf('deleted');
-      var seen = {}, list = [];
-      for (var i = 1; i < rows.length; i++) {
-        var r = rows[i];
-        if (iDel >= 0 && String(r[iDel]||'').trim().toLowerCase() === 'true') continue;
-        var no   = String(r[iNo]  ||'').trim();
-        var cust = String(r[iCust]||'').trim();
-        if (!no || seen[no]) continue;
-        seen[no] = true;
-        list.push({ no: no, customer: cust });
-      }
-      // Merge in-memory list for anything not in CSV
-      _tmyWdRefBuildList().forEach(function(m) {
-        if (!seen[m.no]) { seen[m.no] = true; list.push(m); }
-      });
-      var refEl = document.getElementById('tmyWdRef');
-      if (refEl && document.activeElement === refEl) {
-        var cur = refEl.value.trim();
-        if (cur) _renderTmyWdRefAC(cur, list);
-      }
-    })
-    .catch(function(e) { console.warn('[TmyWdRef] CSV fetch failed:', e); });
+  }, 600);
 }
 
 function _renderTmyWdRefAC(v, list) {
