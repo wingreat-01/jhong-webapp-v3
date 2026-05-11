@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_5.html -->
+<!-- saved from url=(0054)file:///C:/Users/CHAD-INVENTORY/Downloads/index_6.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -647,10 +647,10 @@ header{display:none!important}
   <span id="loadingText">Syncing from Google Sheets...</span>
 </div>
 
-<div class="sync-indicator" id="syncIndicator" role="status" aria-live="polite">
+<div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
-  <span class="sync-txt" id="syncIndicatorText">Synced in 6.1s (partial: received, salesorders, yardsreceived, beginning, yardswithdrawn, withdrawals, partialrolls, itemcode)</span>
-  <span class="sync-progress" id="syncIndicatorProgress"></span>
+  <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
+  <span class="sync-progress" id="syncIndicatorProgress">7/9</span>
 </div>
 
 <div class="toast" id="toast">Synced in 6.1s (partial: received, salesorders, yardsreceived, beginning, yardswithdrawn, withdrawals, partialrolls, itemcode)</div>
@@ -680,7 +680,7 @@ header{display:none!important}
   </nav>
 
   <div class="sidebar-footer">
-    <button class="sidebar-footer-btn" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">Sync Now</button>
+    <button class="sidebar-footer-btn loading" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">Syncing...</button>
     <button class="sidebar-footer-btn" id="settingsBtn" onclick="openSettingsWithPin()" title="Show setup / config panel — protected by 4-digit PIN">⚙ Settings 🔒</button>
     <button class="sidebar-footer-btn" id="designModeBtn" onclick="openDesignModeWithPin()" title="Design Mode — click to label every UI region with a codename">🛠 Design 🔒</button>
     <div class="sidebar-user">
@@ -2518,9 +2518,24 @@ function parseYardsWithdrawnRows(rows) {
     if (_isDeletedFlag(r[iDel])) continue;
     var coreNo = String(r[iCore]||'').trim();
     if (!coreNo) continue;
+    var rawDate = r[iDate];
+    var dateStr = '';
+    if (rawDate instanceof Date) {
+      dateStr = rawDate.getFullYear()+'-'+String(rawDate.getMonth()+1).padStart(2,'0')+'-'+String(rawDate.getDate()).padStart(2,'0');
+    } else {
+      var s = String(rawDate||'').trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        dateStr = s.slice(0,10);
+      } else if (s) {
+        var d = new Date(s);
+        dateStr = !isNaN(d.getTime())
+          ? d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
+          : s.slice(0,10);
+      }
+    }
     out.push({
       id:     String(r[iId]||'').trim() || ('ywd_legacy_r'+(i)),
-      date:   String(r[iDate]||'').trim(),
+      date:   dateStr,
       coreNo: coreNo,
       itemId: String(r[iItem]||'').trim(),
       yards:  parseFloat(r[iYards]) || 0,
