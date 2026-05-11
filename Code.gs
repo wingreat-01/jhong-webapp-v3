@@ -585,14 +585,13 @@ function _getItemcodeSheet() {
   if (!sh) throw new Error('ITEMCODE tab not found in JHONG BACKEND.');
   return sh;
 }
-// Returns array of {code, desc} from CODEMAP columns A (code) and B (description).
+// Returns [{code, desc}] from CODEMAP col A (code) and col B (description).
 function _getCodemapCodes() {
   var ss = _openSS();
   var sh = ss.getSheetByName(CODEMAP_TAB);
   if (!sh) return [];
   var lastRow = sh.getLastRow();
   if (lastRow < 2) return [];
-  // Columns A+B = columns 1 and 2
   var values = sh.getRange(2, 1, lastRow - 1, 2).getValues();
   var result = [];
   values.forEach(function(row) {
