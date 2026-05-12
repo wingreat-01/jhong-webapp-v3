@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_45.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_46.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -4308,9 +4308,9 @@ function clear3MYardsForm() {
 // ---------- Item ID autocomplete (3M Yards form — mirrors Withdraw tab) ----------
 var _tmyAcIndex = -1;
 
-// Extract width to autofill: trailing numeric suffix in code takes priority
-// (e.g. "3923-HIP-FLUO-Y/G-24" -> "24"), then first number in size string
-// (e.g. "48 x 50" -> "48").
+// Extracts the correct width from an item code + size string.
+// Priority 1: trailing numeric suffix in the code (e.g. "3923-HIP-FLUO-Y/G-24" -> 24).
+// Priority 2: first number in the size string (e.g. "48 x 50" -> 48).
 function _tmyWidthFromItem(code, size) {
   var cm = String(code || '').match(/-(\d+(?:\.\d+)?)$/);
   if (cm) return cm[1];
@@ -4343,7 +4343,6 @@ function _tmyAcPreviewDesc(code) {
   var d = document.getElementById('tmyItemDesc');
   var w = document.getElementById('tmyWidth');
   if (d) d.value = item.desc || '';
-  // Always overwrite width on hover-preview so switching items updates the field
   if (w) w.value = _tmyWidthFromItem(code, item.size);
 }
 
@@ -4404,7 +4403,6 @@ function pickTmyItem(code) {
   var match = (STATE.items || []).find(function(it){ return it.code === code; });
   if (match) {
     document.getElementById('tmyItemDesc').value = match.desc || '';
-    // Always overwrite width so switching item codes always reflects the correct width
     document.getElementById('tmyWidth').value = _tmyWidthFromItem(code, match.size);
   }
   hideTmyItemAC();
