@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_43.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_44.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -4308,6 +4308,17 @@ function clear3MYardsForm() {
 // ---------- Item ID autocomplete (3M Yards form — mirrors Withdraw tab) ----------
 var _tmyAcIndex = -1;
 
+// Extract the width number to autofill the Width field.
+// Priority 1: trailing numeric suffix in the item code (e.g. "3923-HIP-FLUO-Y/G-24" -> "24").
+// Priority 2: first number before the "x" in the size string (e.g. "48 x 50" -> "48").
+function _tmyWidthFromItem(code, size) {
+  var cm = String(code || '').match(/-(\d+(?:\.\d+)?)$/);
+  if (cm) return cm[1];
+  var sm = String(size || '').match(/^(\d+(?:\.\d+)?)/);
+  if (sm) return sm[1];
+  return size || '';
+}
+
 function onTmyItemInput() {
   var v = document.getElementById('tmyItemId').value.trim();
   _tmyFillItemDetails(v);
@@ -4319,7 +4330,7 @@ function _tmyFillItemDetails(v) {
   var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
   if (match) {
     document.getElementById('tmyItemDesc').value = match.desc || '';
-    if (!document.getElementById('tmyWidth').value) document.getElementById('tmyWidth').value = match.size || '';
+    if (!document.getElementById('tmyWidth').value) document.getElementById('tmyWidth').value = _tmyWidthFromItem(v, match.size);
   } else {
     document.getElementById('tmyItemDesc').value = '';
   }
@@ -4332,7 +4343,7 @@ function _tmyAcPreviewDesc(code) {
   var d = document.getElementById('tmyItemDesc');
   var w = document.getElementById('tmyWidth');
   if (d) d.value = item.desc || '';
-  if (w && !w.value) w.value = item.size || '';
+  if (w && !w.value) w.value = _tmyWidthFromItem(code, item.size);
 }
 
 function showTmyItemAC(v) {
@@ -4392,7 +4403,7 @@ function pickTmyItem(code) {
   var match = (STATE.items || []).find(function(it){ return it.code === code; });
   if (match) {
     document.getElementById('tmyItemDesc').value = match.desc || '';
-    if (!document.getElementById('tmyWidth').value) document.getElementById('tmyWidth').value = match.size || '';
+    if (!document.getElementById('tmyWidth').value) document.getElementById('tmyWidth').value = _tmyWidthFromItem(code, match.size);
   }
   hideTmyItemAC();
   document.getElementById('tmyQtyYards').focus();
@@ -6925,16 +6936,14 @@ function parseSalesOrderGsheetCSV(csvText) {
       cols: cols,
       _itemId: itemId,
       _date: rawDate,
-      _dateMs: _parseSoDateMs(rawDate),
-      _rowIdx: r   // preserve sheet row number for same-date tiebreaking
+      _dateMs: _parseSoDateMs(rawDate)
     });
   }
-  // Sort newest first by date; when dates tie, higher sheet row (later entry) wins.
+  // Sort newest first by date (rows with unparseable dates sink to the bottom).
   kept.sort(function(a, b){
     var ta = (a._dateMs == null) ? -Infinity : a._dateMs;
     var tb = (b._dateMs == null) ? -Infinity : b._dateMs;
-    if (ta !== tb) return tb - ta;
-    return b._rowIdx - a._rowIdx;  // same date → later row in sheet goes first
+    return tb - ta;
   });
   STATE.salesOrderGsheet = kept;
 }
