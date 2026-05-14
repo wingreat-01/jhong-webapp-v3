@@ -48,7 +48,7 @@ var SALESORDER_TAB      = 'SALESORDER';
 var SPLIT_TAB           = 'SPLIT';
 var SERVED_TAB          = 'SERVED';
 // Each header now ends with Deleted + DeletedAt + DeletedBy for soft-delete audit.
-var WITHDRAWAL_HEADER    = ['Date','ItemCode','Description','Size','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var WITHDRAWAL_HEADER    = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var RECEIVED_HEADER      = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var YARDSRECEIVED_HEADER = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var PARTIALROLLS_TAB    = 'PARTIALROLLS';
@@ -59,7 +59,7 @@ var YARDSWITHDRAWN_TAB    = 'YARDSWITHDRAWN';
 var YARDSWITHDRAWN_HEADER = ['Date','CoreNo','ItemID','Width','WidthUnit','Yards','LengthUnit','Ref','Customer','ID','Deleted','DeletedAt','DeletedBy'];
 var DISPOSAL_TAB    = 'DISPOSAL';
 var DISPOSAL_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
-var BEGINNING_HEADER  = ['Date','ItemCode','Description','Size','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
+var BEGINNING_HEADER  = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
 var SALESORDER_HEADER = ['ID','Date','Time','OrderNo','Customer','Remarks','Items','Status','Deleted','DeletedAt','DeletedBy'];
 var SPLIT_HEADER      = ['Date','SplitID','ParentCode','ParentDesc','ParentSize','ParentQty','ChildCode','ChildDesc','ChildSize','ChildQty','Note'];
 var SERVED_HEADER     = ['Date','JobOrder','ItemID','Width','Length','Qty','Unit','Customer','Urgency','Status','Sales','ServedAt','RowKey','ID','Deleted','DeletedAt','DeletedBy'];
@@ -191,8 +191,23 @@ function _handleWrite(body) {
     var rawId = String(r.id || '').trim();
     var id = (rawId && !/^whd_legacy_/.test(rawId)) ? rawId : _genId('whd');
     var sh = _getWithdrawalSheet();
-    var existing = _findRowById(sh, 9, id);
-    var row = [r.date||'', String(r.itemCode), r.desc||'', r.size||'', Number(r.qty)||0, r.withdrawalNo||'', r.customer||'', r.remarks||'', id, false, '', ''];
+    // ID column is now column 12 (1-based) after Width/W-UM/Length/L-UM replaced Size
+    var existing = _findRowById(sh, 12, id);
+    // Parse width/length — accept individual fields; fall back to splitting legacy Size string
+    var _width  = String(r.width  || '').trim();
+    var _wUnit  = String(r.widthUnit  || '').trim();
+    var _length = String(r.length || '').trim();
+    var _lUnit  = String(r.lengthUnit || '').trim();
+    if (!_width && !_length && r.size) {
+      var _sm = String(r.size).match(/^([0-9\/\-\.]+)\s*([a-zA-Z\"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z\"']*)$/);
+      if (_sm) {
+        _width = _sm[1] || ''; _wUnit = _sm[2] || '';
+        _length = _sm[3] || ''; _lUnit = _sm[4] || '';
+      } else {
+        _width = String(r.size); // fallback: whole string in Width
+      }
+    }
+    var row = [r.date||'', String(r.itemCode), r.desc||'', _width, _wUnit, _length, _lUnit, Number(r.qty)||0, r.withdrawalNo||'', r.customer||'', r.remarks||'', id, false, '', ''];
     if (existing !== -1) {
       sh.getRange(existing, 1, 1, row.length).setValues([row]);
     } else {
@@ -217,7 +232,7 @@ function _handleWrite(body) {
     var rowIdx = -1;
     var did = String(body.id || '').trim();
     if (did) {
-      rowIdx = _findRowById(sh, 9, did);
+      rowIdx = _findRowById(sh, 12, did);
       if (rowIdx === -1) return _json({ok:false, error:'Withdrawal not found: '+did});
     } else {
       var sr = parseInt(body.sheetRow, 10);
@@ -419,7 +434,7 @@ function _handleWrite(body) {
     // Step 2 — write a real ID into every blank cell in column I, rows 2+.
     var lastRow = bsh.getLastRow();
     if (lastRow < 2) return _json({ok:true, filled:0, headerRepaired:headerChanged});
-    var idRange = bsh.getRange(2, 9, lastRow - 1, 1);
+    var idRange = bsh.getRange(2, 12, lastRow - 1, 1);
     var ids = idRange.getValues();
     var filled = 0;
     for (var bi = 0; bi < ids.length; bi++) {
@@ -440,12 +455,26 @@ function _handleWrite(body) {
     var bexisting = _findRowByCode(bsh, 2, b.code);
     var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Manila', 'yyyy-MM-dd');
     var qtyNum = Number(b.qty)||0;
+    // Parse width/length — accept individual fields; fall back to splitting legacy Size string
+    var _bWidth  = String(b.width  || '').trim();
+    var _bWUnit  = String(b.widthUnit  || '').trim();
+    var _bLength = String(b.length || '').trim();
+    var _bLUnit  = String(b.lengthUnit || '').trim();
+    if (!_bWidth && !_bLength && b.size) {
+      var _bSm = String(b.size).match(/^([0-9\/\-\.]+)\s*([a-zA-Z\"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z\"']*)$/);
+      if (_bSm) {
+        _bWidth = _bSm[1] || ''; _bWUnit = _bSm[2] || '';
+        _bLength = _bSm[3] || ''; _bLUnit = _bSm[4] || '';
+      } else {
+        _bWidth = String(b.size);
+      }
+    }
     if (bexisting === -1) {
-      var brow = [today, String(b.code), b.desc||'', b.size||'', qtyNum, b.notes||'', false, '', ''];
+      var brow = [today, String(b.code), b.desc||'', _bWidth, _bWUnit, _bLength, _bLUnit, qtyNum, b.notes||'', false, '', ''];
       bsh.appendRow(brow);
     } else {
       var existingDate = bsh.getRange(bexisting, 1).getValue() || today;
-      var brow2 = [existingDate, String(b.code), b.desc||'', b.size||'', qtyNum, b.notes||'', false, '', ''];
+      var brow2 = [existingDate, String(b.code), b.desc||'', _bWidth, _bWUnit, _bLength, _bLUnit, qtyNum, b.notes||'', false, '', ''];
       bsh.getRange(bexisting, 1, 1, brow2.length).setValues([brow2]);
     }
     return _json({ok:true, code: b.code, qty: qtyNum});
@@ -457,7 +486,21 @@ function _handleWrite(body) {
     var absh = _getBeginningSheet();
     var abDate = ab.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Manila', 'yyyy-MM-dd');
     var abQty = Number(ab.qty)||0;
-    var abRow = [abDate, String(ab.code), ab.desc||'', ab.size||'', abQty, _safeText(ab.notes||''), false, '', ''];
+    // Parse width/length — accept individual fields; fall back to splitting legacy Size string
+    var _abWidth  = String(ab.width  || '').trim();
+    var _abWUnit  = String(ab.widthUnit  || '').trim();
+    var _abLength = String(ab.length || '').trim();
+    var _abLUnit  = String(ab.lengthUnit || '').trim();
+    if (!_abWidth && !_abLength && ab.size) {
+      var _abSm = String(ab.size).match(/^([0-9\/\-\.]+)\s*([a-zA-Z\"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z\"']*)$/);
+      if (_abSm) {
+        _abWidth = _abSm[1] || ''; _abWUnit = _abSm[2] || '';
+        _abLength = _abSm[3] || ''; _abLUnit = _abSm[4] || '';
+      } else {
+        _abWidth = String(ab.size);
+      }
+    }
+    var abRow = [abDate, String(ab.code), ab.desc||'', _abWidth, _abWUnit, _abLength, _abLUnit, abQty, _safeText(ab.notes||''), false, '', ''];
     absh.appendRow(abRow);
     return _json({ok:true, code: ab.code, qty: abQty, row: absh.getLastRow()});
   }
@@ -518,11 +561,25 @@ function _handleWrite(body) {
       if (!it.code) return;
       var existing = _findRowByCode(bsh4, 2, it.code);
       var qn = Number(it.qty)||0;
+      // Parse width/length — accept individual fields; fall back to splitting legacy Size string
+      var _itWidth  = String(it.width  || '').trim();
+      var _itWUnit  = String(it.widthUnit  || '').trim();
+      var _itLength = String(it.length || '').trim();
+      var _itLUnit  = String(it.lengthUnit || '').trim();
+      if (!_itWidth && !_itLength && it.size) {
+        var _itSm = String(it.size).match(/^([0-9\/\-\.]+)\s*([a-zA-Z\"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z\"']*)$/);
+        if (_itSm) {
+          _itWidth = _itSm[1] || ''; _itWUnit = _itSm[2] || '';
+          _itLength = _itSm[3] || ''; _itLUnit = _itSm[4] || '';
+        } else {
+          _itWidth = String(it.size);
+        }
+      }
       if (existing === -1) {
-        bsh4.appendRow([todayB, String(it.code), it.desc||'', it.size||'', qn, it.notes||'', false, '', '']);
+        bsh4.appendRow([todayB, String(it.code), it.desc||'', _itWidth, _itWUnit, _itLength, _itLUnit, qn, it.notes||'', false, '', '']);
       } else {
         var existDate = bsh4.getRange(existing, 1).getValue() || todayB;
-        bsh4.getRange(existing, 1, 1, 9).setValues([[existDate, String(it.code), it.desc||'', it.size||'', qn, it.notes||'', false, '', '']]);
+        bsh4.getRange(existing, 1, 1, 12).setValues([[existDate, String(it.code), it.desc||'', _itWidth, _itWUnit, _itLength, _itLUnit, qn, it.notes||'', false, '', '']]);
       }
       n++;
     });
@@ -808,7 +865,7 @@ function _writeStockMonitorContent(ss, sh) {
     ? icSh.getRange(2, 1, icSh.getLastRow() - 1, Math.max(7, icSh.getLastColumn())).getValues()
     : [];
 
-  // BEGINNING: [Date, ItemCode, Desc, Size, Qty, Notes, Deleted, ...]
+  // BEGINNING: [Date, ItemCode, Desc, Width, W-UM, Length, L-UM, Qty, Notes, Deleted, ...]
   var begSh   = _getBeginningSheet();
   var begData = begSh.getLastRow() > 1
     ? begSh.getRange(2, 1, begSh.getLastRow() - 1, begSh.getLastColumn()).getValues()
@@ -852,13 +909,13 @@ function _writeStockMonitorContent(ss, sh) {
 
   // ── 2. Build lookup maps ─────────────────────────────────────────
 
-  // Beginning: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col G=6)
+  // Beginning: sum qty per itemCode (col B=1, qty=col H=7, Deleted=col J=9)
   var begMap = {};
   begData.forEach(function(r) {
     var code    = String(r[1] || '').trim();
-    var deleted = r[6];                            // col G  (1-based col 7)
+    var deleted = r[9];                            // col J  (1-based col 10)
     if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
-    begMap[code] = (begMap[code] || 0) + (parseFloat(r[4]) || 0);
+    begMap[code] = (begMap[code] || 0) + (parseFloat(r[7]) || 0);
   });
 
   // Received: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col J=9)
@@ -1174,6 +1231,153 @@ function _writeStockMonitorContent(ss, sh) {
 // save_beginning_bulk, save_partialroll, delete_partialroll).
 //
 // =====================================================================
-// DONE — paste this file's content at the bottom of Code.gs and run
-// buildStockMonitorSheet() once from the Apps Script editor.
+// MIGRATION: Split legacy SIZE column into Width / W-UM / Length / L-UM
+// for the BEGINNING sheet (mirrors migrateWithdrawalSizeColumn)
 // =====================================================================
+// Run this ONCE from the Apps Script editor after deploying the updated
+// BEGINNING_HEADER.
+//
+// HOW TO RUN:
+//   1. Open your JHONG BACKEND spreadsheet → Extensions → Apps Script.
+//   2. Select function "migrateBeginningSheet" from the dropdown.
+//   3. Click ▶ Run.  Check the Execution Log for results.
+// =====================================================================
+function migrateBeginningSheet() {
+  var sh = _getBeginningSheet();
+  var lastRow = sh.getLastRow();
+  if (lastRow < 1) { Logger.log('BEGINNING sheet is empty — nothing to migrate.'); return; }
+
+  // Read header row
+  var headerRange = sh.getRange(1, 1, 1, sh.getLastColumn());
+  var header = headerRange.getValues()[0].map(function(h){ return String(h||'').trim(); });
+
+  // Detect layout by inspecting column D header
+  var colD = header[3] || ''; // 0-based index 3 = column D
+  if (colD === 'Width') {
+    Logger.log('BEGINNING sheet already uses the new Width/W-UM/Length/L-UM layout. No migration needed.');
+    return;
+  }
+
+  // Old layout: [Date, ItemCode, Description, Size, Qty, Notes, Deleted, DeletedAt, DeletedBy]
+  // New layout: [Date, ItemCode, Description, Width, W-UM, Length, L-UM, Qty, Notes, Deleted, DeletedAt, DeletedBy]
+  // Strategy:
+  //   1. Insert 3 blank columns after column D (position 4) to make room for W-UM, Length, L-UM
+  //   2. Write new header row
+  //   3. Parse each data row's old Size (now col D) into Width+W-UM+Length+L-UM
+
+  Logger.log('Migrating ' + (lastRow - 1) + ' BEGINNING rows from SIZE → Width/W-UM/Length/L-UM...');
+
+  // Step 1: Insert 3 columns after column D (col 4, 1-based)
+  sh.insertColumnsAfter(4, 3);  // inserts cols E, F, G → old E-I shift to H-L
+
+  // Step 2: Write the canonical header
+  sh.getRange(1, 1, 1, BEGINNING_HEADER.length).setValues([BEGINNING_HEADER]);
+
+  // Step 3: Read all data rows (now expanded after insert)
+  if (lastRow < 2) {
+    Logger.log('No data rows to migrate.');
+    SpreadsheetApp.flush();
+    return;
+  }
+  var totalCols = sh.getLastColumn();
+  var data = sh.getRange(2, 1, lastRow - 1, totalCols).getValues();
+
+  var migrated = 0;
+  var sizeRe = /^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/;
+
+  data.forEach(function(row, ri) {
+    var sizeVal = String(row[3] || '').trim();  // col D (0-based 3) = old Size
+    if (!sizeVal) return;                        // nothing to parse
+    var width = '', wUnit = '', length = '', lUnit = '';
+    var m = sizeVal.match(sizeRe);
+    if (m) {
+      width  = m[1] || ''; wUnit  = m[2] || '';
+      length = m[3] || ''; lUnit  = m[4] || '';
+    } else {
+      width = sizeVal;  // unparseable — store whole string in Width
+    }
+    // Write Width(D), W-UM(E), Length(F), L-UM(G) — columns 4,5,6,7 (1-based)
+    sh.getRange(ri + 2, 4, 1, 4).setValues([[width, wUnit, length, lUnit]]);
+    migrated++;
+  });
+
+  SpreadsheetApp.flush();
+  Logger.log('BEGINNING migration complete. ' + migrated + ' rows updated.');
+}
+
+// =====================================================================
+// MIGRATION: Split legacy SIZE column into Width / W-UM / Length / L-UM
+// =====================================================================
+// Run this ONCE from the Apps Script editor after deploying the updated
+// WITHDRAWAL_HEADER.  It reads every row in the WITHDRAWAL sheet, checks
+// whether columns D-G match the NEW header (Width/W-UM/Length/L-UM), and
+// if the sheet still uses the old layout (Size in col D) it migrates each
+// row in place.
+//
+// HOW TO RUN:
+//   1. Open your JHONG BACKEND spreadsheet → Extensions → Apps Script.
+//   2. Select function "migrateWithdrawalSizeColumn" from the dropdown.
+//   3. Click ▶ Run.  Check the Execution Log for results.
+// =====================================================================
+function migrateWithdrawalSizeColumn() {
+  var sh = _getWithdrawalSheet();
+  var lastRow = sh.getLastRow();
+  if (lastRow < 1) { Logger.log('WITHDRAWAL sheet is empty — nothing to migrate.'); return; }
+
+  // Read header row
+  var headerRange = sh.getRange(1, 1, 1, sh.getLastColumn());
+  var header = headerRange.getValues()[0].map(function(h){ return String(h||'').trim(); });
+
+  // Detect layout by inspecting column D header
+  var colD = header[3] || ''; // 0-based index 3 = column D
+  if (colD === 'Width') {
+    Logger.log('WITHDRAWAL sheet already uses the new Width/W-UM/Length/L-UM layout. No migration needed.');
+    return;
+  }
+
+  // Old layout: [Date, ItemCode, Description, Size, Qty, WithdrawalNo, Customer, Remarks, ID, Deleted, DeletedAt, DeletedBy]
+  // New layout: [Date, ItemCode, Description, Width, W-UM, Length, L-UM, Qty, WithdrawalNo, Customer, Remarks, ID, Deleted, DeletedAt, DeletedBy]
+  // Strategy:
+  //   1. Insert 3 blank columns after column D (position 4) to make room for W-UM, Length, L-UM
+  //   2. Write new header row
+  //   3. Parse each data row's old Size (now col D) into Width+W-UM+Length+L-UM
+
+  Logger.log('Migrating ' + (lastRow - 1) + ' WITHDRAWAL rows from SIZE → Width/W-UM/Length/L-UM...');
+
+  // Step 1: Insert 3 columns after column D (col 4, 1-based)
+  sh.insertColumnsAfter(4, 3);  // inserts cols E, F, G → old E-L shift to H-O
+
+  // Step 2: Write the canonical header
+  sh.getRange(1, 1, 1, WITHDRAWAL_HEADER.length).setValues([WITHDRAWAL_HEADER]);
+
+  // Step 3: Read all data rows (now columns A–O after insert)
+  if (lastRow < 2) {
+    Logger.log('No data rows to migrate.');
+    SpreadsheetApp.flush();
+    return;
+  }
+  var totalCols = sh.getLastColumn();
+  var data = sh.getRange(2, 1, lastRow - 1, totalCols).getValues();
+
+  var migrated = 0;
+  var sizeRe = /^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/;
+
+  data.forEach(function(row, ri) {
+    var sizeVal = String(row[3] || '').trim();  // col D (0-based 3) = old Size
+    if (!sizeVal) return;                        // nothing to parse
+    var width = '', wUnit = '', length = '', lUnit = '';
+    var m = sizeVal.match(sizeRe);
+    if (m) {
+      width  = m[1] || ''; wUnit  = m[2] || '';
+      length = m[3] || ''; lUnit  = m[4] || '';
+    } else {
+      width = sizeVal;  // unparseable — store whole string in Width
+    }
+    // Write Width(D), W-UM(E), Length(F), L-UM(G) — columns 4,5,6,7 (1-based)
+    sh.getRange(ri + 2, 4, 1, 4).setValues([[width, wUnit, length, lUnit]]);
+    migrated++;
+  });
+
+  SpreadsheetApp.flush();
+  Logger.log('Migration complete. ' + migrated + ' rows updated.');
+}
