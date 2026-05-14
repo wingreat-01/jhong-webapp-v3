@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_52.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_53.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -661,13 +661,13 @@ header{display:none!important}
   <span id="loadingText">Syncing from Google Sheets...</span>
 </div>
 
-<div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
+<div class="sync-indicator" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
-  <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
+  <span class="sync-txt" id="syncIndicatorText">Synced in 11.2s (partial: yardsreceived, salesorders, yardswithdrawn, withdrawals, received, beginning, itemcode, partialrolls)</span>
+  <span class="sync-progress" id="syncIndicatorProgress"></span>
 </div>
 
-<div class="toast" id="toast">Sync complete — 5.6s — 281 items, 242 withdrawals, 25 received, 194 beginning, 0 orders</div>
+<div class="toast show error" id="toast">Synced in 11.2s (partial: yardsreceived, salesorders, yardswithdrawn, withdrawals, received, beginning, itemcode, partialrolls)</div>
 
 <div class="app-shell">
 
@@ -694,7 +694,7 @@ header{display:none!important}
   </nav>
 
   <div class="sidebar-footer">
-    <button class="sidebar-footer-btn loading" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">Syncing...</button>
+    <button class="sidebar-footer-btn" id="syncBtn" onclick="syncNow({force:true})" title="Sync data from Google Sheets">Sync Now</button>
     <button class="sidebar-footer-btn" id="settingsBtn" onclick="openSettingsWithPin()" title="Show setup / config panel — protected by 4-digit PIN">⚙ Settings 🔒</button>
     <button class="sidebar-footer-btn" id="designModeBtn" onclick="openDesignModeWithPin()" title="Design Mode — click to label every UI region with a codename">🛠 Design 🔒</button>
     <div class="sidebar-user">
@@ -1141,6 +1141,23 @@ header{display:none!important}
         <div class="form-group">
           <label class="form-label">Qty (Yards) *</label>
           <input class="form-input" type="number" id="tmyQtyYards" placeholder="0" min="0" step="any">
+        </div>
+        <div class="form-group">
+          <label class="form-label">W-UM</label>
+          <select class="form-input" id="tmyWidthUnit">
+            <option value="in" selected="">in</option>
+            <option value="cm">cm</option>
+            <option value="mm">mm</option>
+            <option value="ft">ft</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">L-UM</label>
+          <select class="form-input" id="tmyLengthUnit">
+            <option value="yds" selected="">yds</option>
+            <option value="m">m</option>
+            <option value="ft">ft</option>
+          </select>
         </div>
         <div class="form-group">
           <label class="form-label">Remarks</label>
@@ -4207,9 +4224,11 @@ function save3MYardsRoll() {
   var coreNo  = (document.getElementById('tmyCoreNo').value || '').trim();
   var itemId  = (document.getElementById('tmyItemId').value || '').trim();
   var desc    = (document.getElementById('tmyItemDesc').value || '').trim();
-  var width   = (document.getElementById('tmyWidth').value || '').trim();
-  var qty     = parseFloat(document.getElementById('tmyQtyYards').value);
-  var remarks = (document.getElementById('tmyRemarks').value || '').trim();
+  var width       = (document.getElementById('tmyWidth').value || '').trim();
+  var qty         = parseFloat(document.getElementById('tmyQtyYards').value);
+  var widthUnit   = (document.getElementById('tmyWidthUnit').value || 'in').trim();
+  var lengthUnit  = (document.getElementById('tmyLengthUnit').value || 'yds').trim();
+  var remarks     = (document.getElementById('tmyRemarks').value || '').trim();
   if (!coreNo) { showToast('Core No. is required', 'error'); return; }
   if (!itemId) { showToast('Item ID is required', 'error'); return; }
   if (isNaN(qty) || qty < 0) { showToast('Qty (Yards) must be 0 or greater', 'error'); return; }
@@ -4248,7 +4267,7 @@ function save3MYardsRoll() {
     // the backend needs it as a fallback lookup key when _backendId is blank
     // (e.g. rows added manually in the sheet before the ID column existed).
     var originalMrrNo = editingCore;
-    rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks, _backendId: existingBackendId };
+    rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, widthUnit:widthUnit, qtyYards:qty, lengthUnit:lengthUnit, withdrawn:wd, remarks:remarks, _backendId: existingBackendId };
     showToast('Roll updated — syncing to YARDSRECEIVED…', 'success');
 
     // === Sync edit to YARDSRECEIVED sheet in JHONG BACKEND ===
@@ -4260,8 +4279,8 @@ function save3MYardsRoll() {
       return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     })();
     var editRec3m = {
-      id:             existingBackendId,   // may be blank — backend falls back to originalMrrNo
-      originalMrrNo:  originalMrrNo,       // backend uses this if id lookup fails
+      id:             existingBackendId,
+      originalMrrNo:  originalMrrNo,
       date:           today3mEdit,
       itemCode:       itemId,
       desc:           desc,
@@ -4269,7 +4288,9 @@ function save3MYardsRoll() {
       qty:            qty,
       mrrNo:          coreNo,
       supplier:       '3M',
-      remarks:        remarks || '3M Yards Roll'
+      remarks:        remarks || '3M Yards Roll',
+      widthUnit:      widthUnit,
+      lengthUnit:     lengthUnit
     };
     var _editIdx = idx; // capture for closure
     postToScript({action:'save_yardsreceived', record: editRec3m},
@@ -4287,7 +4308,7 @@ function save3MYardsRoll() {
       return;
     }
     var recId3m = 'yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
-    rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:wd, remarks:remarks, _backendId: recId3m });
+    rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, widthUnit:widthUnit, qtyYards:qty, lengthUnit:lengthUnit, withdrawn:wd, remarks:remarks, _backendId: recId3m });
     showToast('Roll added — saving to YARDSRECEIVED…', 'success');
 
     // === Sync new roll to YARDSRECEIVED sheet in JHONG BACKEND ===
@@ -4298,15 +4319,17 @@ function save3MYardsRoll() {
         + String(d.getDate()).padStart(2,'0');
     })();
     var recRec3m = {
-      id:       recId3m,
-      date:     today3m,
-      itemCode: itemId,
-      desc:     desc,
-      size:     width,
-      qty:      qty,
-      mrrNo:    coreNo,
-      supplier: '3M',
-      remarks:  remarks || '3M Yards Roll'
+      id:         recId3m,
+      date:       today3m,
+      itemCode:   itemId,
+      desc:       desc,
+      size:       width,
+      qty:        qty,
+      mrrNo:      coreNo,
+      supplier:   '3M',
+      remarks:    remarks || '3M Yards Roll',
+      widthUnit:  widthUnit,
+      lengthUnit: lengthUnit
     };
     postToScript({action:'save_yardsreceived', record: recRec3m},
       function(res){
@@ -4333,6 +4356,10 @@ function edit3MYardsRoll(coreNo) {
   document.getElementById('tmyItemDesc').value  = r.itemDesc || '';
   document.getElementById('tmyWidth').value     = r.width || '';
   document.getElementById('tmyQtyYards').value  = r.qtyYards != null ? r.qtyYards : '';
+  var wuEl = document.getElementById('tmyWidthUnit');
+  if (wuEl) wuEl.value = r.widthUnit || 'in';
+  var luEl = document.getElementById('tmyLengthUnit');
+  if (luEl) luEl.value = r.lengthUnit || 'yds';
   document.getElementById('tmyRemarks').value   = r.remarks || '';
   var btn = document.getElementById('tmySubmitBtn');
   if (btn) { btn.textContent = '✓ Update Roll'; btn.style.background = '#E65100'; }
@@ -4364,6 +4391,10 @@ function clear3MYardsForm() {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
+  var wuEl = document.getElementById('tmyWidthUnit');
+  if (wuEl) wuEl.value = 'in';
+  var luEl = document.getElementById('tmyLengthUnit');
+  if (luEl) luEl.value = 'yds';
   STATE._editingThreeMYardsCore = null;
   var btn = document.getElementById('tmySubmitBtn');
   if (btn) { btn.textContent = '+ Add Roll'; btn.style.background = ''; }
