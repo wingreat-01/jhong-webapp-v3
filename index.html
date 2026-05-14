@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_60.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_61.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -664,7 +664,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">9/10</span>
+  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
 </div>
 
 <div class="toast" id="toast">Sync complete — 5.6s — 281 items, 242 withdrawals, 25 received, 194 beginning, 0 orders</div>
@@ -2434,9 +2434,9 @@ function parseItemcodeRows(rows) {
     if (h === 'item description' || h === 'description' || h === 'desc' || h === 'item desc') descIdx = i;
     if (h === 'size' || h === 'unit' || h === 'units') sizeIdx = i;
     if (h === 'width') widthValIdx = i;
-    if (h === 'width unit' || h === 'wunit') widthUnitIdx = i;
+    if (h === 'w-um' || h === 'wum' || h === 'width unit' || h === 'widthunit') widthUnitIdx = i;
     if (h === 'length') lengthValIdx = i;
-    if (h === 'length unit' || h === 'lunit') lengthUnitIdx = i;
+    if (h === 'l-um' || h === 'lum' || h === 'length unit' || h === 'lengthunit') lengthUnitIdx = i;
     if (h === 'stocking' || h === 'stocking unit' || h === 'stock unit' || h === 'uom') stockingIdx = i;
     if (qtyIdx === -1 && (h.indexOf('qty') !== -1 || h.indexOf('stock') !== -1 || h.indexOf('available') !== -1 || h.indexOf('quantity') !== -1 || h.indexOf('on hand') !== -1)) qtyIdx = i;
   });
@@ -2449,8 +2449,14 @@ function parseItemcodeRows(rows) {
     widthValIdx = 3; widthUnitIdx = 4; lengthValIdx = 5; lengthUnitIdx = 6;
     hasSplitSize = true;
   }
-  // Column G (index 6) = Stocking; positional fallback only if header-based detection missed it
-  if (stockingIdx === -1 && header.length >= 7) stockingIdx = 6;
+  // Stocking unit is col 7 (index 7) in the new ITEMCODE layout:
+  // [ItemCode(0), Desc(1), Width(2 or 3), W-UM(3 or 4), Length(4 or 5), L-UM(5 or 6), Stocking(6 or 7)]
+  // Only use positional fallback for stocking if it doesn't clash with the length-unit column.
+  if (stockingIdx === -1) {
+    var stockFallback = (header.length >= 8) ? 7 : (header.length >= 7 ? 6 : -1);
+    // Don't overwrite lengthUnitIdx with stocking
+    if (stockFallback >= 0 && stockFallback !== lengthUnitIdx) stockingIdx = stockFallback;
+  }
   if (!hasSplitSize && sizeIdx === -1) sizeIdx = 2;
 
   var results = [];
@@ -2461,11 +2467,12 @@ function parseItemcodeRows(rows) {
     if (!code) continue;
 
     var size = '';
+    var wVal = '', wUnit = '', lVal = '', lUnit = '';
     if (hasSplitSize) {
-      var wVal = String(cols[widthValIdx]||'').trim();
-      var wUnit = String(widthUnitIdx >= 0 ? cols[widthUnitIdx]||'' : '').trim();
-      var lVal = String(cols[lengthValIdx]||'').trim();
-      var lUnit = String(lengthUnitIdx >= 0 ? cols[lengthUnitIdx]||'' : '').trim();
+      wVal  = String(cols[widthValIdx]||'').trim();
+      wUnit = String(widthUnitIdx  >= 0 ? cols[widthUnitIdx] ||'' : '').trim();
+      lVal  = String(cols[lengthValIdx]||'').trim();
+      lUnit = String(lengthUnitIdx >= 0 ? cols[lengthUnitIdx]||'' : '').trim();
       if (wVal || lVal) {
         var wPart = wVal + (wUnit ? wUnit : '');
         var lPart = lVal + (lUnit ? lUnit : '');
@@ -2485,7 +2492,12 @@ function parseItemcodeRows(rows) {
 
     var stocking = stockingIdx >= 0 ? String(cols[stockingIdx]||'').trim().toUpperCase() : '';
 
-    results.push({code: code, desc: desc, size: size, origQty: origQty, stocking: stocking});
+    results.push({
+      code: code, desc: desc, size: size,
+      width: wVal, widthUnit: wUnit,
+      length: lVal, lengthUnit: lUnit,
+      origQty: origQty, stocking: stocking
+    });
   }
   return results;
 }
@@ -9402,42 +9414,32 @@ function parseBeginningRows(rows) {
   var iCode  = col('itemcode'),
       iWidth = col('width'),   iWUnit = col('w-um'),
       iLen   = col('length'),  iLUnit = col('l-um'),
-      iSize  = col('size'),    // legacy fallback — old sheet had this
+      iSize  = col('size'),    // legacy fallback
       iQty   = col('qty'),
       iNotes = col('notes'),   iDate = col('date'), iDel = col('deleted');
-  // Column-position fallbacks.
   // NEW layout: [Date(0), ItemCode(1), Desc(2), Width(3), W-UM(4), Length(5), L-UM(6), Qty(7), Notes(8), Deleted(9)…]
   // OLD layout: [Date(0), ItemCode(1), Desc(2), Size(3),           Qty(4),    Notes(5), Deleted(6)…]
-  // Use header-detected indices first; fall back to positional only when the
-  // column truly wasn't found by name.
   if (iCode  === -1) iCode  = 1;
   if (iDate  === -1) iDate  = 0;
-  var isNewLayout = (iWidth >= 0);   // new sheet has an explicit Width column
+  var isNewLayout = (iWidth >= 0);
   if (iQty   === -1) iQty   = isNewLayout ? 7 : 4;
   if (iNotes === -1) iNotes = isNewLayout ? 8 : 5;
   if (iDel   === -1) iDel   = isNewLayout ? 9 : 6;
   var out = {};
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
-    if (iDel >= 0 && _isDeletedFlag(r[iDel])) continue;   // skip soft-deleted
+    if (iDel >= 0 && _isDeletedFlag(r[iDel])) continue;
     var code = String(iCode>=0 ? r[iCode] : '').trim();
     if (!code) continue;
-    var thisQty   = iQty>=0   ? (parseFloat(r[iQty])||0)             : 0;
-    var thisNotes = iNotes>=0 ? String(r[iNotes]||'').trim()          : '';
-    var thisDate  = iDate>=0  ? formatRawDate(String(r[iDate]||''))  : '';
+    var thisQty   = iQty>=0   ? (parseFloat(r[iQty])||0)            : 0;
+    var thisNotes = iNotes>=0 ? String(r[iNotes]||'').trim()         : '';
+    var thisDate  = iDate>=0  ? formatRawDate(String(r[iDate]||'')) : '';
     if (out[code]) {
-      // Same item code on multiple rows (e.g. Split-Roll appends rows) —
-      // sum qty and concatenate notes so running balance stays correct.
       out[code].qty += thisQty;
       if (thisNotes) out[code].notes = out[code].notes ? (out[code].notes + ' | ' + thisNotes) : thisNotes;
       if (!out[code].date && thisDate) out[code].date = thisDate;
     } else {
-      out[code] = {
-        qty:   thisQty,
-        notes: thisNotes,
-        date:  thisDate,
-        source: 'backend'
-      };
+      out[code] = { qty: thisQty, notes: thisNotes, date: thisDate, source: 'backend' };
     }
   }
   return out;
