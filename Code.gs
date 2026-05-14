@@ -56,7 +56,7 @@ var PARTIALROLLS_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','Lengt
 var PARTIALWITHDRAW_TAB    = 'PARTIALWITHDRAW';
 var PARTIALWITHDRAW_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Ref','Size','Note','ID','Deleted','DeletedAt','DeletedBy'];
 var YARDSWITHDRAWN_TAB    = 'YARDSWITHDRAWN';
-var YARDSWITHDRAWN_HEADER = ['Date','CoreNo','ItemID','Width','Yards','Ref','Customer','ID','Deleted','DeletedAt','DeletedBy'];
+var YARDSWITHDRAWN_HEADER = ['Date','CoreNo','ItemID','Width','WidthUnit','Yards','LengthUnit','Ref','Customer','ID','Deleted','DeletedAt','DeletedBy'];
 var DISPOSAL_TAB    = 'DISPOSAL';
 var DISPOSAL_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var BEGINNING_HEADER  = ['Date','ItemCode','Description','Size','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
@@ -343,10 +343,11 @@ function _handleWrite(body) {
     if (!yw.coreNo) return _json({ok:false, error:'Missing coreNo'});
     var ywid = yw.id || _genId('tmywd');
     var ywsh = _getYardsWithdrawnSheet();
-    var ywexisting = _findRowById(ywsh, 8, ywid);
+    var ywexisting = _findRowById(ywsh, 10, ywid);
     var ywrow = [
       yw.date||'', String(yw.coreNo), String(yw.itemId||''),
-      yw.width||'', Number(yw.yards)||0, yw.ref||'', _safeText(yw.customer||''),
+      yw.width||'', yw.widthUnit||'in', Number(yw.yards)||0, yw.lengthUnit||'yds',
+      yw.ref||'', _safeText(yw.customer||''),
       ywid, false, '', ''
     ];
     if (ywexisting === -1) ywsh.appendRow(ywrow);
@@ -358,7 +359,7 @@ function _handleWrite(body) {
     var dywid = String(body.id || '').trim();
     if (!dywid) return _json({ok:false, error:'Missing id for delete_yardswithdrawn'});
     var dywsh = _getYardsWithdrawnSheet();
-    var dywIdx = _findRowById(dywsh, 8, dywid);
+    var dywIdx = _findRowById(dywsh, 10, dywid);
     if (dywIdx === -1) return _json({ok:true, removed:false});
     dywsh.deleteRow(dywIdx);
     return _json({ok:true, hard:true, row:dywIdx});
@@ -686,3 +687,493 @@ function _json(obj){
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+// =====================================================================
+// STOCK MONITOR SHEET — Add-on for JHONG Withdrawal System v3.34
+// =====================================================================
+// HOW TO USE:
+//   1. Open your JHONG BACKEND Google Spreadsheet.
+//   2. Go to Extensions → Apps Script.
+//   3. Paste this entire file's content at the BOTTOM of your existing
+//      Code.gs (after the last line).
+//   4. Save (💾).
+//   5. Run `buildStockMonitorSheet` once manually:
+//        → In the Apps Script editor, select function "buildStockMonitorSheet"
+//          from the dropdown and click ▶ Run.
+//      This creates the STOCKS_MONITOR sheet with all headers and formulas.
+//   6. Set up auto-refresh (optional but recommended):
+//        → Run `setupStockMonitorTrigger` once to schedule an hourly refresh.
+//      Or just call `refreshStockMonitorSheet` any time you want a manual
+//      refresh (it re-reads all live data and rewrites the sheet).
+//
+// HOW IT UPDATES IN REAL TIME:
+//   The STOCKS_MONITOR sheet uses two update mechanisms:
+//     a) Native Google Sheets IMPORTRANGE / named-range cross-tab formulas
+//        for the TOTAL YARDS and PARTIAL ROLLS summary rows at the bottom.
+//        These recalculate automatically whenever source data changes.
+//     b) The Apps Script function `refreshStockMonitorSheet` rebuilds the
+//        per-item stock rows on demand.  Install the time-based trigger
+//        (via setupStockMonitorTrigger) to auto-refresh every hour, or call
+//        it from doGet/doPost after any save action (see the hook below).
+//
+// FORMULA USED (mirrors the frontend exactly):
+//   Available = origQty (ITEMCODE col G) + beginning + received − withdrawn
+//   where:
+//     beginning = sum of non-deleted BEGINNING rows for that item code
+//     received  = sum of non-deleted RECEIVED rows for that item code
+//     withdrawn = sum of non-deleted WITHDRAWAL rows for that item code
+// =====================================================================
+
+var STOCK_MONITOR_TAB = 'STOCKS_MONITOR';
+
+// ── Public entry points ──────────────────────────────────────────────
+
+/**
+ * buildStockMonitorSheet()
+ * Creates (or fully rebuilds) the STOCKS_MONITOR tab.
+ * Safe to run multiple times — it clears and rewrites every time.
+ * Call this once from the Apps Script editor after pasting this file.
+ */
+function buildStockMonitorSheet() {
+  var ss = _openSS();
+
+  // Create or clear the sheet
+  var sh = ss.getSheetByName(STOCK_MONITOR_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(STOCK_MONITOR_TAB);
+    // Move it right after ITEMCODE for visibility
+    var icIdx = ss.getSheetByName(ITEMCODE_TAB)
+      ? ss.getSheetByName(ITEMCODE_TAB).getIndex()
+      : 1;
+    ss.setActiveSheet(sh);
+    ss.moveActiveSheet(icIdx + 1);
+  } else {
+    sh.clearContents();
+    sh.clearFormats();
+    sh.clearNotes();
+  }
+
+  _writeStockMonitorContent(ss, sh);
+  SpreadsheetApp.flush();
+  Logger.log('STOCKS_MONITOR sheet built successfully.');
+}
+
+/**
+ * refreshStockMonitorSheet()
+ * Re-reads all inventory data and rewrites only the data rows
+ * (keeps headers/footer intact). Call this from a time trigger or
+ * hook it into doPost after any save action.
+ */
+function refreshStockMonitorSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(STOCK_MONITOR_TAB);
+  if (!sh) {
+    buildStockMonitorSheet();
+    return;
+  }
+  _writeStockMonitorContent(ss, sh);
+  SpreadsheetApp.flush();
+}
+
+/**
+ * setupStockMonitorTrigger()
+ * Installs an hourly time-based trigger that calls refreshStockMonitorSheet.
+ * Run this once from the Apps Script editor.
+ * (Deletes any previous trigger for the same function first.)
+ */
+function setupStockMonitorTrigger() {
+  // Remove any existing triggers for this function
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'refreshStockMonitorSheet') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('refreshStockMonitorSheet')
+    .timeBased()
+    .everyHours(1)
+    .create();
+  Logger.log('Hourly trigger for refreshStockMonitorSheet installed.');
+}
+
+// ── Core writer ──────────────────────────────────────────────────────
+
+function _writeStockMonitorContent(ss, sh) {
+  var tz = Session.getScriptTimeZone() || 'Asia/Manila';
+
+  // ── 1. Read all source data ──────────────────────────────────────
+
+  // ITEMCODE: [ItemCode, Description, Width, WidthUnit, Length, LengthUnit, Qty/Stock, ...]
+  var icSh    = _getItemcodeSheet();
+  var icData  = icSh.getLastRow() > 1
+    ? icSh.getRange(2, 1, icSh.getLastRow() - 1, Math.max(7, icSh.getLastColumn())).getValues()
+    : [];
+
+  // BEGINNING: [Date, ItemCode, Desc, Size, Qty, Notes, Deleted, ...]
+  var begSh   = _getBeginningSheet();
+  var begData = begSh.getLastRow() > 1
+    ? begSh.getRange(2, 1, begSh.getLastRow() - 1, begSh.getLastColumn()).getValues()
+    : [];
+
+  // RECEIVED: [Date, ItemCode, Desc, Size, Qty, MRR, Supplier, Remarks, ID, Deleted, ...]
+  var recSh   = _getReceivedSheet();
+  var recData = recSh.getLastRow() > 1
+    ? recSh.getRange(2, 1, recSh.getLastRow() - 1, recSh.getLastColumn()).getValues()
+    : [];
+
+  // WITHDRAWAL: [Date, ItemCode, Desc, Size, Qty, WdNo, Customer, Remarks, ID, Deleted, ...]
+  var whdSh   = _getWithdrawalSheet();
+  var whdData = whdSh.getLastRow() > 1
+    ? whdSh.getRange(2, 1, whdSh.getLastRow() - 1, whdSh.getLastColumn()).getValues()
+    : [];
+
+  // YARDSRECEIVED: [Date, ItemCode, Desc, Size, Qty, MRR, Supplier, Remarks, ID, Deleted, ...]
+  var yrSh    = _getYardsReceivedSheet();
+  var yrData  = yrSh.getLastRow() > 1
+    ? yrSh.getRange(2, 1, yrSh.getLastRow() - 1, yrSh.getLastColumn()).getValues()
+    : [];
+
+  // YARDSWITHDRAWN: [Date, CoreNo, ItemID, Width, Yards, Ref, Customer, ID, Deleted, ...]
+  var ywSh    = _getYardsWithdrawnSheet();
+  var ywData  = ywSh.getLastRow() > 1
+    ? ywSh.getRange(2, 1, ywSh.getLastRow() - 1, ywSh.getLastColumn()).getValues()
+    : [];
+
+  // PARTIALROLLS: [Date, ItemCode, Width, WidthUnit, Length, LengthUnit, Qty, Ref, Size, WdID, ID, Deleted, ...]
+  var prSh    = _getPartialRollsSheet();
+  var prData  = prSh.getLastRow() > 1
+    ? prSh.getRange(2, 1, prSh.getLastRow() - 1, prSh.getLastColumn()).getValues()
+    : [];
+
+  // PARTIALWITHDRAW: [Date, ItemCode, Width, WidthUnit, Length, LengthUnit, Qty, Ref, Size, Note, ID, Deleted, ...]
+  var pwSh    = _getPartialWithdrawSheet();
+  var pwData  = pwSh.getLastRow() > 1
+    ? pwSh.getRange(2, 1, pwSh.getLastRow() - 1, pwSh.getLastColumn()).getValues()
+    : [];
+
+  // ── 2. Build lookup maps ─────────────────────────────────────────
+
+  // Beginning: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col G=6)
+  var begMap = {};
+  begData.forEach(function(r) {
+    var code    = String(r[1] || '').trim();
+    var deleted = r[6];                            // col G  (1-based col 7)
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    begMap[code] = (begMap[code] || 0) + (parseFloat(r[4]) || 0);
+  });
+
+  // Received: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col J=9)
+  var recMap = {};
+  recData.forEach(function(r) {
+    var code    = String(r[1] || '').trim();
+    var deleted = r[9];
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    recMap[code] = (recMap[code] || 0) + (parseFloat(r[4]) || 0);
+  });
+
+  // Withdrawn: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col J=9)
+  var whdMap = {};
+  whdData.forEach(function(r) {
+    var code    = String(r[1] || '').trim();
+    var deleted = r[9];
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    whdMap[code] = (whdMap[code] || 0) + (parseFloat(r[4]) || 0);
+  });
+
+  // ── 3. ITEMCODE column detection (mirrors frontend parser) ───────
+  // Frontend looks for a column whose header contains qty/stock/available/quantity
+  // Fallback: col G (index 6) which is the standard 7th column.
+  var icHeader = icSh.getLastRow() > 0
+    ? icSh.getRange(1, 1, 1, Math.max(7, icSh.getLastColumn())).getValues()[0]
+    : [];
+  var origQtyIdx = 6; // default col G (0-based index 6)
+  for (var hi = 0; hi < icHeader.length; hi++) {
+    var hh = String(icHeader[hi] || '').toLowerCase();
+    if (hh.indexOf('qty') !== -1 || hh.indexOf('stock') !== -1 ||
+        hh.indexOf('available') !== -1 || hh.indexOf('quantity') !== -1 ||
+        hh.indexOf('on hand') !== -1) {
+      origQtyIdx = hi;
+      break;
+    }
+  }
+
+  // ── 4. Compute per-item stock rows ───────────────────────────────
+  var itemRows = [];
+  icData.forEach(function(r) {
+    var code = String(r[0] || '').trim();
+    if (!code) return;
+    var desc     = String(r[1] || '').trim();
+    var width    = r[2] !== undefined ? String(r[2]).trim() : '';
+    var wUnit    = r[3] !== undefined ? String(r[3]).trim() : '';
+    var length   = r[4] !== undefined ? String(r[4]).trim() : '';
+    var lUnit    = r[5] !== undefined ? String(r[5]).trim() : '';
+    var size     = (width && length) ? (width + ' x ' + length) : 'n/a';
+    var origQty  = parseFloat(r[origQtyIdx] || 0) || 0;
+    var beg      = begMap[code]  || 0;
+    var rec      = recMap[code]  || 0;
+    var whd      = whdMap[code]  || 0;
+    var avail    = origQty + beg + rec - whd;
+
+    var status;
+    if (avail <= 0)      status = 'Out of Stock';
+    else if (avail <= 3) status = 'Low Stock';
+    else                 status = 'In Stock';
+
+    itemRows.push([code, desc, size, origQty, beg, rec, whd, avail, status]);
+  });
+
+  // ── 5. Yards stock summary ───────────────────────────────────────
+  // Group YARDSRECEIVED by itemCode; subtract YARDSWITHDRAWN (matched by CoreNo/ItemID)
+  // YARDSRECEIVED: col B=itemCode(1), col E=qty yards(4), Deleted col J(9)
+  var yrByItem = {};
+  yrData.forEach(function(r) {
+    var code    = String(r[1] || '').trim();
+    var deleted = r[9];
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    if (!yrByItem[code]) yrByItem[code] = {received: 0, withdrawn: 0};
+    yrByItem[code].received += parseFloat(r[4]) || 0;
+  });
+
+  // YARDSWITHDRAWN: col C=itemId(2), col E=yards(4), Deleted col I(8)
+  ywData.forEach(function(r) {
+    var code    = String(r[2] || '').trim();   // ItemID column
+    var deleted = r[8];
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    if (!yrByItem[code]) yrByItem[code] = {received: 0, withdrawn: 0};
+    yrByItem[code].withdrawn += parseFloat(r[4]) || 0;
+  });
+
+  var yardsRows = [];
+  var totalYardsRec = 0, totalYardsWd = 0;
+  Object.keys(yrByItem).sort().forEach(function(code) {
+    var d       = yrByItem[code];
+    var balance = d.received - d.withdrawn;
+    totalYardsRec += d.received;
+    totalYardsWd  += d.withdrawn;
+    yardsRows.push([code, d.received, d.withdrawn, balance]);
+  });
+
+  // ── 6. Partial rolls summary ─────────────────────────────────────
+  // PARTIALROLLS: Deleted col L(11). Count active rows per itemCode.
+  // PARTIALWITHDRAW: Deleted col L(11). Count active withdrawals per itemCode.
+  var prByItem = {};
+  prData.forEach(function(r) {
+    var code    = String(r[1] || '').trim();
+    var deleted = r[11];
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    if (!prByItem[code]) prByItem[code] = {received: 0, withdrawn: 0};
+    prByItem[code].received += parseFloat(r[6]) || 1; // qty col G(6), default 1 roll
+  });
+  pwData.forEach(function(r) {
+    var code    = String(r[1] || '').trim();
+    var deleted = r[11];
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    if (!prByItem[code]) prByItem[code] = {received: 0, withdrawn: 0};
+    prByItem[code].withdrawn += parseFloat(r[6]) || 1;
+  });
+
+  var partialRows = [];
+  var totalPrIn = 0, totalPrOut = 0;
+  Object.keys(prByItem).sort().forEach(function(code) {
+    var d       = prByItem[code];
+    var balance = d.received - d.withdrawn;
+    totalPrIn  += d.received;
+    totalPrOut += d.withdrawn;
+    partialRows.push([code, d.received, d.withdrawn, balance]);
+  });
+
+  // ── 7. Assemble all output rows ──────────────────────────────────
+  var now         = Utilities.formatDate(new Date(), tz, 'MMM dd, yyyy  HH:mm:ss');
+  var allRows     = [];
+  var formats     = [];   // parallel array of background colours
+  var fontColors  = [];
+  var fontWeights = [];
+  var hAligns     = [];   // horizontal alignment per row
+
+  function row(cells, bg, fc, fw, ha) {
+    allRows.push(cells);
+    formats.push(bg    || '#FFFFFF');
+    fontColors.push(fc  || '#000000');
+    fontWeights.push(fw || 'normal');
+    hAligns.push(ha    || 'left');
+  }
+
+  // ── Title block ──
+  row(['JHONG WITHDRAWAL SYSTEM — STOCK MONITOR', '', '', '', '', '', '', '', ''],
+      '#1B5E20', '#FFFFFF', 'bold', 'left');
+  row(['Last refreshed: ' + now, '', '', '', '', '', '', '', ''],
+      '#E8F5E9', '#2E7D32', 'normal', 'left');
+  row([], '#FFFFFF');  // blank spacer
+
+  // ── Section 1: MAIN STOCK ON HAND ──
+  row(['■  MAIN STOCK — ON HAND  (formula: origQty + beginning + received − withdrawn)',
+       '', '', '', '', '', '', '', ''],
+      '#2E7D32', '#FFFFFF', 'bold', 'left');
+  row(['Item Code', 'Description', 'Size', 'Orig Qty', 'Beginning', 'Received',
+       'Withdrawn', 'Available', 'Status'],
+      '#A5D6A7', '#1B5E20', 'bold', 'center');
+
+  var mainStartRow = allRows.length + 1; // 1-based, will be used for totals formula
+  var totalAvail = 0;
+  itemRows.forEach(function(r) {
+    var avail   = r[7];
+    var status  = r[8];
+    var rowBg   = (allRows.length % 2 === 0) ? '#F9FBE7' : '#FFFFFF';
+    var statFc  = status === 'In Stock'    ? '#2E7D32'
+                : status === 'Low Stock'   ? '#E65100'
+                :                           '#C62828';
+    // Columns: Code, Desc, Size, OrigQty, Beg, Rec, Whd, Avail, Status
+    allRows.push(r);
+    formats.push(rowBg);
+    fontColors.push('#000000');
+    fontWeights.push('normal');
+    hAligns.push('left');
+    // Override avail colour (col H = index 7) and status (col I = index 8) below
+    totalAvail += avail;
+  });
+  var mainEndRow = allRows.length;
+
+  // Totals row for main section
+  row(['', 'TOTAL ITEMS: ' + itemRows.length, '', '', '', '', '', totalAvail, ''],
+      '#C8E6C9', '#1B5E20', 'bold', 'right');
+  row([], '#FFFFFF');  // blank spacer
+
+  // ── Section 2: YARDS STOCK ──
+  row(['▲  TOTAL YARDS STOCK  (YARDSRECEIVED − YARDSWITHDRAWN per item)',
+       '', '', '', ''],
+      '#1565C0', '#FFFFFF', 'bold', 'left');
+  row(['Item Code / Item ID', 'Yards Received', 'Yards Withdrawn', 'Balance (yards)'],
+      '#BBDEFB', '#0D47A1', 'bold', 'center');
+
+  if (yardsRows.length === 0) {
+    row(['(No yards stock data found)', '', '', ''], '#F5F5F5', '#9E9E9E', 'italic', 'left');
+  } else {
+    yardsRows.forEach(function(r) {
+      var balance = r[3];
+      var rowBg   = (allRows.length % 2 === 0) ? '#E3F2FD' : '#FFFFFF';
+      allRows.push(r);
+      formats.push(rowBg);
+      fontColors.push(balance > 0 ? '#1565C0' : '#C62828');
+      fontWeights.push('normal');
+      hAligns.push('left');
+    });
+  }
+  var yardsRec = yardsRows.length > 0 ? totalYardsRec : 0;
+  var yardsWd  = yardsRows.length > 0 ? totalYardsWd  : 0;
+  row(['TOTALS', yardsRec, yardsWd, yardsRec - yardsWd],
+      '#90CAF9', '#0D47A1', 'bold', 'right');
+  row([], '#FFFFFF');  // blank spacer
+
+  // ── Section 3: PARTIAL ROLLS STOCK ──
+  row(['◆  PARTIAL ROLLS STOCK  (PARTIALROLLS − PARTIALWITHDRAW per item)',
+       '', '', '', ''],
+      '#6A1B9A', '#FFFFFF', 'bold', 'left');
+  row(['Item Code', 'Rolls In (partial)', 'Rolls Out (partial)', 'Balance (rolls)'],
+      '#E1BEE7', '#4A148C', 'bold', 'center');
+
+  if (partialRows.length === 0) {
+    row(['(No partial rolls data found)', '', '', ''], '#F5F5F5', '#9E9E9E', 'italic', 'left');
+  } else {
+    partialRows.forEach(function(r) {
+      var balance = r[3];
+      var rowBg   = (allRows.length % 2 === 0) ? '#F3E5F5' : '#FFFFFF';
+      allRows.push(r);
+      formats.push(rowBg);
+      fontColors.push(balance > 0 ? '#6A1B9A' : '#C62828');
+      fontWeights.push('normal');
+      hAligns.push('left');
+    });
+  }
+  var prIn  = partialRows.length > 0 ? totalPrIn  : 0;
+  var prOut = partialRows.length > 0 ? totalPrOut : 0;
+  row(['TOTALS', prIn, prOut, prIn - prOut],
+      '#CE93D8', '#4A148C', 'bold', 'right');
+
+  // ── 8. Write everything to the sheet ────────────────────────────
+  sh.clearContents();
+  sh.clearFormats();
+
+  // Determine column count from widest row
+  var maxCols = 9; // main section has 9 cols
+  var totalRows = allRows.length;
+  if (totalRows === 0) return;
+
+  // Pad every row to maxCols so setValues works
+  var padded = allRows.map(function(r) {
+    var arr = r.slice(0, maxCols);
+    while (arr.length < maxCols) arr.push('');
+    return arr;
+  });
+
+  sh.getRange(1, 1, totalRows, maxCols).setValues(padded);
+
+  // Apply background colours (col A–I, but rows with only 4 data cols
+  // just get the colour on all 9 cols — harmless).
+  for (var ri = 0; ri < totalRows; ri++) {
+    var rowRange = sh.getRange(ri + 1, 1, 1, maxCols);
+    rowRange.setBackground(formats[ri]);
+    rowRange.setFontColor(fontColors[ri]);
+    rowRange.setFontWeight(fontWeights[ri]);
+    if (hAligns[ri] !== 'left') {
+      // Right-align numeric columns for data rows, header-center for header rows
+      if (hAligns[ri] === 'center') {
+        rowRange.setHorizontalAlignment('center');
+      } else {
+        sh.getRange(ri + 1, 4, 1, 6).setHorizontalAlignment('right');
+      }
+    }
+  }
+
+  // ── Status column colour override for main stock rows (col I = 9) ──
+  // Find them by scanning the Status column values
+  for (var ri2 = 0; ri2 < padded.length; ri2++) {
+    var statusVal = padded[ri2][8];
+    if (statusVal === 'In Stock')    sh.getRange(ri2+1, 9).setFontColor('#2E7D32').setFontWeight('bold');
+    else if (statusVal === 'Low Stock')   sh.getRange(ri2+1, 9).setFontColor('#E65100').setFontWeight('bold');
+    else if (statusVal === 'Out of Stock') sh.getRange(ri2+1, 9).setFontColor('#C62828').setFontWeight('bold');
+  }
+
+  // ── Format column widths ──
+  sh.setColumnWidth(1, 200);  // Item Code
+  sh.setColumnWidth(2, 280);  // Description
+  sh.setColumnWidth(3, 110);  // Size
+  sh.setColumnWidth(4, 90);   // Orig Qty
+  sh.setColumnWidth(5, 90);   // Beginning
+  sh.setColumnWidth(6, 90);   // Received
+  sh.setColumnWidth(7, 90);   // Withdrawn
+  sh.setColumnWidth(8, 95);   // Available
+  sh.setColumnWidth(9, 120);  // Status
+
+  // ── Freeze header rows (title + refreshed + blank + section header = 4 rows, then col header = row 5) ──
+  sh.setFrozenRows(5);
+  sh.setFrozenColumns(1);
+
+  // ── Title row: merge across all 9 cols ──
+  sh.getRange(1, 1, 1, maxCols).merge().setFontSize(13);
+  sh.getRange(2, 1, 1, maxCols).merge().setFontSize(10).setFontStyle('italic');
+
+  Logger.log('STOCKS_MONITOR written: ' + totalRows + ' rows, ' +
+             itemRows.length + ' items, ' +
+             yardsRows.length + ' yard items, ' +
+             partialRows.length + ' partial-roll items.');
+}
+
+// =====================================================================
+// OPTIONAL: Hook refreshStockMonitorSheet into every write action
+// =====================================================================
+// If you want the sheet to update automatically whenever ANY save
+// action runs (not just on a timer), add this one line to the bottom
+// of every `if (action === 'save_*')` block in _handleWrite():
+//
+//   refreshStockMonitorSheet();
+//   return _json({ok:true, ...});
+//
+// For performance, you can instead call it only after the actions that
+// affect stock (save_withdrawal, delete_withdrawal, save_received,
+// delete_received, save_yardsreceived, delete_yardsreceived,
+// save_yardswithdrawn, delete_yardswithdrawn, save_beginning_single,
+// save_beginning_bulk, save_partialroll, delete_partialroll).
+//
+// =====================================================================
+// DONE — paste this file's content at the bottom of Code.gs and run
+// buildStockMonitorSheet() once from the Apps Script editor.
+// =====================================================================
