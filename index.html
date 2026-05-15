@@ -1193,8 +1193,8 @@ header{display:none!important}
             <th>Description</th>
             <th>Width</th>
             <th title="Width Unit of Measure">W-UM</th>
-            <th style="text-align:right">Qty (Yards)</th>
-            <th title="Length Unit of Measure">L-UM</th>
+            <th style="text-align:right">Length</th>
+            <th title="Length Unit of Measure (defaults to yds)">L-UM</th>
             <th style="text-align:right">Withdrawn</th>
             <th style="text-align:right">Available</th>
             <th>Remarks</th>
@@ -1590,7 +1590,7 @@ header{display:none!important}
       <button class="audit-ledger-btn" id="auditLedger-yards" onclick="auditSelectLedger(&#39;yards&#39;)">
         <div class="alb-icon">📏</div>
         <div class="alb-title">Yards Stock</div>
-        <div class="alb-sub">3M Yards rolls (YARDSRECEIVED + YARDSWITHDRAWN)</div>
+        <div class="alb-sub">3M Yards rolls (YARDS-STOCK + YARDSWITHDRAWN)</div>
       </button>
       <button class="audit-ledger-btn" id="auditLedger-partial" onclick="auditSelectLedger(&#39;partial&#39;)">
         <div class="alb-icon">✂️</div>
@@ -2323,27 +2323,21 @@ function syncNow(opts) {
     }
   }));
 
-  // ── YARDSRECEIVED → STATE.threeMYards ──────────────────────────────
-  // Reads the YARDSRECEIVED sheet and rebuilds the 3M Roll Ledger so it
-  // stays in sync with the backend across all devices.
+  // ── YARDS-STOCK → STATE.threeMYards ────────────────────────────────
+  // Reads the YARDS-STOCK sheet (new home for the 3M Roll Ledger) and
+  // rebuilds STATE.threeMYards so all devices stay in sync.
   total++;
   jobs.push(new Promise(function(resolve){
     var _settled = false;
     function _finish() { if (_settled) return; _settled = true; bumpProg(); resolve(); }
-    // Hard 12-second Promise-level timeout — guards against AbortController not
-    // being supported or the fetch silently hanging (GAS cold start, quota, etc.).
     var _guard = setTimeout(function(){
-      if (!_settled) { console.warn('read_yardsreceived: timed out'); failed.push('yardsreceived'); _finish(); }
+      if (!_settled) { console.warn('read_yards_stock: timed out'); failed.push('yards_stock'); _finish(); }
     }, 12000);
     if (!STATE.config.proxyUrl) { clearTimeout(_guard); _finish(); return; }
-    fetchFromAppsScript('read_yardsreceived',
+    fetchFromAppsScript('read_yards_stock',
       function(rows){
         clearTimeout(_guard);
-        var parsed = parseYardsReceivedRows(rows || []);
-        // Replace from backend only when we got parseable rolls, OR when the
-        // sheet is genuinely empty (header-only). If the backend returned data
-        // rows but parsing produced nothing (e.g. column-name mismatch), keep
-        // the existing local state so data is not silently wiped.
+        var parsed = parseYardsStockRows(rows || []);
         var backendHasDataRows = (rows || []).length > 1;
         if (parsed.length > 0 || !backendHasDataRows) {
           var existing = STATE.threeMYards || [];
@@ -2354,16 +2348,16 @@ function syncNow(opts) {
             return r;
           });
         } else {
-          console.warn('read_yardsreceived: backend returned', (rows||[]).length-1,
-            'rows but parser yielded 0 — keeping local state. Check YARDSRECEIVED sheet headers.');
+          console.warn('read_yards_stock: backend returned', (rows||[]).length-1,
+            'rows but parser yielded 0 — keeping local state. Check YARDS-STOCK sheet headers.');
         }
         try { render3MYards(); } catch(e){}
         _finish();
       },
       function(err){
         clearTimeout(_guard);
-        console.warn('read_yardsreceived:', err);
-        failed.push('yardsreceived');
+        console.warn('read_yards_stock:', err);
+        failed.push('yards_stock');
         _finish();
       }
     );
@@ -2835,15 +2829,15 @@ function parseSplitChildRows(rows) {
   return out;
 }
 
-// ---------- Received rows parser ----------
-// ---------- YARDSRECEIVED rows → STATE.threeMYards format ----------
-// Sheet columns: Date, ItemCode, Description, Size, Qty, MRR(=CoreNo), Supplier, Remarks, ID, Deleted...
-function parseYardsReceivedRows(rows) {
+// ---------- YARDS-STOCK rows → STATE.threeMYards format ----------
+// Sheet columns: Date(0), ItemCode(1), Description(2), Width(3), W-UM(4),
+//   Length(5), L-UM(6), CoreNo(7), Supplier(8), Remarks(9), ID(10),
+//   Deleted(11), DeletedAt(12), DeletedBy(13)
+// Replaces the legacy YARDSRECEIVED single-Size layout. CoreNo (was 'MRR')
+// is now in col H so it doesn't collide with Width/W-UM/Length/L-UM.
+function parseYardsStockRows(rows) {
   if (!rows || rows.length < 2) return [];
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
-  // Try multiple aliases for each column, then fall back to the canonical
-  // 0-based position from YARDSRECEIVED_HEADER so sheets with slightly
-  // different column names (e.g. "Qty (Yards)", "Width", "Desc") still parse.
   function col1(names) {
     for (var i = 0; i < names.length; i++) {
       var idx = header.indexOf(names[i]);
@@ -2851,42 +2845,47 @@ function parseYardsReceivedRows(rows) {
     }
     return -1;
   }
-  var iDate = col1(['date','orderdate']);
-  var iCode = col1(['itemcode','item code','item_code','code','itemid','item id']);
-  var iDesc = col1(['description','desc','itemdesc','item description']);
-  var iSize = col1(['size','width','dimensions']);
-  var iQty  = col1(['qty','quantity','qty (yards)','qty(yards)','yards','qtyyards']);
-  var iMrr  = col1(['mrr','mrr no','mrrno','mrr no.','core no','coreno','core no.','coreno.','mrrno.']);
-  var iSup  = col1(['supplier']);
-  var iRem  = col1(['remarks','notes','note']);
-  var iId   = col1(['id']);
-  var iDel  = col1(['deleted']);
-  // Positional fallbacks (YARDSRECEIVED_HEADER canonical order):
-  // [Date(0), ItemCode(1), Description(2), Size(3), Qty(4), MRR(5), Supplier(6), Remarks(7), ID(8), Deleted(9)]
-  if (iDate < 0) iDate = 0;
-  if (iCode < 0) iCode = 1;
-  if (iDesc < 0) iDesc = 2;
-  if (iSize < 0) iSize = 3;
-  if (iQty  < 0) iQty  = 4;
-  if (iMrr  < 0) iMrr  = 5;
-  if (iSup  < 0) iSup  = 6;
-  // iRem intentionally has no positional fallback — if no 'remarks' column exists, leave as -1
-  if (iId   < 0) iId   = 8;
-  if (iDel  < 0) iDel  = 9;
+  var iDate  = col1(['date','orderdate']);
+  var iCode  = col1(['itemcode','item code','item_code','code','itemid','item id']);
+  var iDesc  = col1(['description','desc','itemdesc','item description']);
+  var iWidth = col1(['width']);
+  var iWU    = col1(['w-um','wum','widthunit','width unit']);
+  var iLen   = col1(['length','qty','quantity','qty (yards)','yards','qtyyards']);
+  var iLU    = col1(['l-um','lum','lengthunit','length unit','yardsunit']);
+  var iCore  = col1(['coreno','core no','core no.','coreno.','mrrno','mrr','mrr no','mrr no.']);
+  var iSup   = col1(['supplier']);
+  var iRem   = col1(['remarks','notes','note']);
+  var iId    = col1(['id']);
+  var iDel   = col1(['deleted']);
+  // Positional fallbacks for YARDS_STOCK_HEADER canonical order:
+  if (iDate  < 0) iDate  = 0;
+  if (iCode  < 0) iCode  = 1;
+  if (iDesc  < 0) iDesc  = 2;
+  if (iWidth < 0) iWidth = 3;
+  if (iWU    < 0) iWU    = 4;
+  if (iLen   < 0) iLen   = 5;
+  if (iLU    < 0) iLU    = 6;
+  if (iCore  < 0) iCore  = 7;
+  if (iSup   < 0) iSup   = 8;
+  // iRem intentionally has no positional fallback — leave as -1 if absent
+  if (iId    < 0) iId    = 10;
+  if (iDel   < 0) iDel   = 11;
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
     if (_isDeletedFlag(r[iDel])) continue;
     var code = String(r[iCode]||'').trim();
     if (!code) continue;
-    var coreNo = String(r[iMrr]||'').trim();
-    if (!coreNo) coreNo = 'ROLL-'+(i); // fallback if MRR blank
+    var coreNo = String(r[iCore]||'').trim();
+    if (!coreNo) coreNo = 'ROLL-'+(i);
     out.push({
       coreNo:     coreNo,
       itemId:     code,
       itemDesc:   String(r[iDesc]||'').trim(),
-      width:      String(r[iSize]||'').trim(),
-      qtyYards:   parseFloat(r[iQty]) || 0,
+      width:      String(r[iWidth]||'').trim(),
+      widthUnit:  String(r[iWU]||'in').trim() || 'in',
+      qtyYards:   parseFloat(r[iLen]) || 0,
+      lengthUnit: String(r[iLU]||'yds').trim() || 'yds',
       withdrawn:  0,    // restored from local state in the merge step
       remarks:    (function(){ var v = iRem >= 0 ? String(r[iRem]||'').trim() : ''; return /^\d{4}-\d{2}-\d{2}/.test(v) ? '' : v; })(),
       _backendId: String(r[iId]||'').trim()
@@ -2894,6 +2893,10 @@ function parseYardsReceivedRows(rows) {
   }
   return out;
 }
+
+// Backwards-compatible alias — older call sites referenced parseYardsReceivedRows.
+// New code should use parseYardsStockRows directly.
+function parseYardsReceivedRows(rows) { return parseYardsStockRows(rows); }
 
 // Parses rows from the YARDSWITHDRAWN sheet.
 // New YARDSWITHDRAWN_HEADER: [Date(0),CoreNo(1),ItemID(2),Width(3),WidthUnit(4),Yards(5),LengthUnit(6),Ref(7),Customer(8),ID(9),Deleted(10)]
@@ -4579,38 +4582,38 @@ function save3MYardsRoll() {
     // (e.g. rows added manually in the sheet before the ID column existed).
     var originalMrrNo = editingCore;
     rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, widthUnit:widthUnit, qtyYards:qty, lengthUnit:lengthUnit, withdrawn:wd, remarks:remarks, _backendId: existingBackendId };
-    showToast('Roll updated — syncing to YARDSRECEIVED…', 'success');
+    showToast('Roll updated — syncing to YARDS-STOCK…', 'success');
 
-    // === Sync edit to YARDSRECEIVED sheet in JHONG BACKEND ===
-    // Send BOTH the existing id AND the originalMrrNo (Core No.) so the backend
-    // can find the row by ID first, then fall back to mrrNo — preventing a
+    // === Sync edit to YARDS-STOCK sheet in JHONG BACKEND ===
+    // Send BOTH the existing id AND the originalCoreNo so the backend
+    // can find the row by ID first, then fall back to coreNo — preventing a
     // duplicate append when _backendId is missing.
     var today3mEdit = (function(){
       var d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     })();
     var editRec3m = {
-      id:             existingBackendId,
-      originalMrrNo:  originalMrrNo,
-      date:           today3mEdit,
-      itemCode:       itemId,
-      desc:           desc,
-      size:           width,
-      qty:            qty,
-      mrrNo:          coreNo,
-      supplier:       '3M',
-      remarks:        remarks || '3M Yards Roll',
-      widthUnit:      widthUnit,
-      lengthUnit:     lengthUnit
+      id:              existingBackendId,
+      originalCoreNo:  originalMrrNo,
+      date:            today3mEdit,
+      itemCode:        itemId,
+      desc:            desc,
+      width:           width,
+      widthUnit:       widthUnit || 'in',
+      length:          qty,
+      lengthUnit:      lengthUnit || 'yds',
+      coreNo:          coreNo,
+      supplier:        '3M',
+      remarks:         remarks || '3M Yards Roll'
     };
     var _editIdx = idx; // capture for closure
-    postToScript({action:'save_yardsreceived', record: editRec3m},
+    postToScript({action:'save_yards_stock', record: editRec3m},
       function(res){
         if (res && res.id) rolls[_editIdx]._backendId = res.id;
         saveState();
-        showToast('Roll updated in YARDSRECEIVED sheet.', 'success');
+        showToast('Roll updated in YARDS-STOCK sheet.', 'success');
       },
-      function(err){ showToast('Updated locally — YARDSRECEIVED sync failed: '+err, 'error'); }
+      function(err){ showToast('Updated locally — YARDS-STOCK sync failed: '+err, 'error'); }
     );
   } else {
     // Add — block duplicate Core No.
@@ -4618,11 +4621,11 @@ function save3MYardsRoll() {
       showToast('A roll with Core No. "'+coreNo+'" already exists.', 'error');
       return;
     }
-    var recId3m = 'yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+    var recId3m = 'ys_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
     rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, widthUnit:widthUnit, qtyYards:qty, lengthUnit:lengthUnit, withdrawn:wd, remarks:remarks, _backendId: recId3m });
-    showToast('Roll added — saving to YARDSRECEIVED…', 'success');
+    showToast('Roll added — saving to YARDS-STOCK…', 'success');
 
-    // === Sync new roll to YARDSRECEIVED sheet in JHONG BACKEND ===
+    // === Sync new roll to YARDS-STOCK sheet in JHONG BACKEND ===
     var today3m = (function(){
       var d = new Date();
       return d.getFullYear() + '-'
@@ -4630,25 +4633,25 @@ function save3MYardsRoll() {
         + String(d.getDate()).padStart(2,'0');
     })();
     var recRec3m = {
-      id:         recId3m,
-      date:       today3m,
-      itemCode:   itemId,
-      desc:       desc,
-      size:       width,
-      qty:        qty,
-      mrrNo:      coreNo,
-      supplier:   '3M',
-      remarks:    remarks || '3M Yards Roll',
-      widthUnit:  widthUnit,
-      lengthUnit: lengthUnit
+      id:          recId3m,
+      date:        today3m,
+      itemCode:    itemId,
+      desc:        desc,
+      width:       width,
+      widthUnit:   widthUnit || 'in',
+      length:      qty,
+      lengthUnit:  lengthUnit || 'yds',
+      coreNo:      coreNo,
+      supplier:    '3M',
+      remarks:     remarks || '3M Yards Roll'
     };
-    postToScript({action:'save_yardsreceived', record: recRec3m},
+    postToScript({action:'save_yards_stock', record: recRec3m},
       function(res){
         if (res && res.id) rolls[0]._backendId = res.id;
-        showToast('Roll saved — row added to YARDSRECEIVED sheet.', 'success');
+        showToast('Roll saved — row added to YARDS-STOCK sheet.', 'success');
       },
       function(err){
-        showToast('Roll saved locally. YARDSRECEIVED sync failed — retry via Sync Now.', 'error');
+        showToast('Roll saved locally. YARDS-STOCK sync failed — retry via Sync Now.', 'error');
       }
     );
   }
@@ -4690,10 +4693,10 @@ function delete3MYardsRoll(coreNo) {
   STATE.threeMYards = (STATE.threeMYards || []).filter(function(x){ return (x.coreNo||'') !== coreNo; });
   saveState();
   render3MYards();
-  // Delete from YARDSRECEIVED sheet in backend
-  postToScript({action:'delete_yardsreceived', id: r._backendId || '', mrrNo: r.coreNo},
+  // Delete from YARDS-STOCK sheet in backend
+  postToScript({action:'delete_yards_stock', id: r._backendId || '', coreNo: r.coreNo},
     function(){ /* deleted from sheet */ },
-    function(err){ showToast('Deleted locally — YARDSRECEIVED sheet delete failed: '+err, 'error'); }
+    function(err){ showToast('Deleted locally — YARDS-STOCK sheet delete failed: '+err, 'error'); }
   );
 }
 
@@ -7124,7 +7127,7 @@ function _soGsStopAutoRefresh() {
 }
 
 // =====================================================================
-//  3M YARDS — live auto-refresh (polls YARDSRECEIVED via Apps Script)
+//  3M YARDS — live auto-refresh (polls YARDS-STOCK via Apps Script)
 //  Starts when the user opens the 3M Yards tab, stops on tab leave.
 // =====================================================================
 var _tmyAutoRefreshMs    = 30000;   // 30 s — new backend rows appear quickly
@@ -7143,9 +7146,9 @@ function _tmyStopAutoRefresh() {
 
 function _tmyAutoRefreshTick() {
   if (!STATE.config.proxyUrl) return;
-  fetchFromAppsScript('read_yardsreceived',
+  fetchFromAppsScript('read_yards_stock',
     function(rows) {
-      var parsed = parseYardsReceivedRows(rows || []);
+      var parsed = parseYardsStockRows(rows || []);
       var backendHasDataRows = (rows || []).length > 1;
       if (parsed.length > 0 || !backendHasDataRows) {
         var existing = STATE.threeMYards || [];
@@ -9110,25 +9113,27 @@ function confirmSendToYards() {
   saveState();
   try { render3MYards(); } catch(e){}
 
-  // Save to YARDSRECEIVED sheet in JHONG BACKEND
+  // Save to YARDS-STOCK sheet in JHONG BACKEND
   var today3m = (function(){
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   })();
-  var recId = 'yrc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
-  postToScript({action:'save_yardsreceived', record:{
-    id:       recId,
-    date:     today3m,
-    itemCode: itemId,
-    desc:     desc,
-    size:     width,
-    qty:      qty,
-    mrrNo:    coreNo,
-    supplier: '3M',
-    remarks:  '3M Yards Roll'
+  var recId = 'ys_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+  postToScript({action:'save_yards_stock', record:{
+    id:          recId,
+    date:        today3m,
+    itemCode:    itemId,
+    desc:        desc,
+    width:       width,
+    widthUnit:   'in',
+    length:      qty,
+    lengthUnit:  'yds',
+    coreNo:      coreNo,
+    supplier:    '3M',
+    remarks:     '3M Yards Roll'
   }},
-    function(){ showToast('✓ Added to Yard Ledger and saved to YARDSRECEIVED sheet.', 'success'); },
-    function(err){ showToast('Added locally — YARDSRECEIVED sync failed: '+err, 'error'); }
+    function(){ showToast('✓ Added to Yard Ledger and saved to YARDS-STOCK sheet.', 'success'); },
+    function(err){ showToast('Added locally — YARDS-STOCK sync failed: '+err, 'error'); }
   );
 
   closeSendToYardsModal();

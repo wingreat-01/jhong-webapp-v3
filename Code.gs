@@ -51,6 +51,13 @@ var SERVED_TAB          = 'SERVED';
 var WITHDRAWAL_HEADER    = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var RECEIVED_HEADER      = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var YARDSRECEIVED_HEADER = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+
+// YARDS-STOCK: new home for the 3M Yards Roll Ledger (replaces YARDSRECEIVED
+// for new rolls). Uses the separate Width / W-UM / Length / L-UM layout that
+// matches the rest of v3.34. CoreNo (was 'MRR' in YARDSRECEIVED) sits in
+// column 8 so it doesn't collide with the standard item-dimension fields.
+var YARDS_STOCK_TAB    = 'YARDS-STOCK';
+var YARDS_STOCK_HEADER = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','CoreNo','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var PARTIALROLLS_TAB    = 'PARTIALROLLS';
 var PARTIALROLLS_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Ref','Size','WithdrawalID','ID','Deleted','DeletedAt','DeletedBy'];
 var PARTIALWITHDRAW_TAB    = 'PARTIALWITHDRAW';
@@ -118,6 +125,7 @@ function doGet(e) {
   if (action === 'read_withdrawals')   return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
   if (action === 'read_received')      return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});
   if (action === 'read_yardsreceived') return _json({ok:true, rows: _getYardsReceivedSheet().getDataRange().getValues()});
+  if (action === 'read_yards_stock')   return _json({ok:true, rows: _getYardsStockSheet().getDataRange().getValues()});
   if (action === 'read_beginning')     return _json({ok:true, rows: _getBeginningSheet().getDataRange().getValues()});
   if (action === 'read_salesorders')   return _json({ok:true, rows: _getSalesOrderSheet().getDataRange().getValues()});
   if (action === 'read_splits')        return _json({ok:true, rows: _getSplitSheet().getDataRange().getValues()});
@@ -322,6 +330,54 @@ function _handleWrite(body) {
     if (yrdRowIdx === -1) return _json({ok:false, error:'YARDSRECEIVED row not found for id='+yrdId+' mrrNo='+(body.mrrNo||'')});
     yrsh2.deleteRow(yrdRowIdx);
     return _json({ok:true, hard:true, row:yrdRowIdx});
+  }
+
+  // ===== YARDS-STOCK (new home for 3M Yards Roll Ledger) =====
+  // Header: [Date(0), ItemCode(1), Description(2), Width(3), W-UM(4),
+  //         Length(5), L-UM(6), CoreNo(7), Supplier(8), Remarks(9),
+  //         ID(10), Deleted(11), DeletedAt(12), DeletedBy(13)]
+  if (action === 'save_yards_stock') {
+    var ys = body.record || {};
+    if (!ys.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var ysid = String(ys.id || '').trim() || _genId('ys');
+    var yssh = _getYardsStockSheet();
+    var ysExisting = _findRowById(yssh, 11, ysid);  // ID column = 11 (col K)
+    // Fallback: if no _backendId match, locate by CoreNo (col 8) so legacy edits
+    // don't append a duplicate row.
+    if (ysExisting === -1) {
+      var ysCoreLookup = String(ys.originalCoreNo || ys.originalMrrNo || '').trim();
+      if (ysCoreLookup) ysExisting = _findRowByCode(yssh, 8, ysCoreLookup);
+    }
+    var ysRow = [
+      ys.date || '',
+      String(ys.itemCode),
+      ys.desc || '',
+      String(ys.width || '').trim(),
+      String(ys.widthUnit || 'in').trim(),
+      Number(ys.length != null ? ys.length : ys.qty) || 0,
+      String(ys.lengthUnit || 'yds').trim(),
+      String(ys.coreNo || ys.mrrNo || '').trim(),
+      String(ys.supplier || '').trim(),
+      _safeText(ys.remarks || ''),
+      ysid, false, '', ''
+    ];
+    if (ysExisting !== -1) yssh.getRange(ysExisting, 1, 1, ysRow.length).setValues([ysRow]);
+    else yssh.appendRow(ysRow);
+    return _json({ok:true, id:ysid});
+  }
+
+  if (action === 'delete_yards_stock') {
+    var dyssh = _getYardsStockSheet();
+    var dysIdx = -1;
+    var dysId = String(body.id || '').trim();
+    if (dysId) dysIdx = _findRowById(dyssh, 11, dysId);
+    if (dysIdx === -1) {
+      var dysCore = String(body.coreNo || body.mrrNo || '').trim();
+      if (dysCore) dysIdx = _findRowByCode(dyssh, 8, dysCore);
+    }
+    if (dysIdx === -1) return _json({ok:false, error:'YARDS-STOCK row not found for id='+dysId+' coreNo='+(body.coreNo||body.mrrNo||'')});
+    dyssh.deleteRow(dysIdx);
+    return _json({ok:true, hard:true, row:dysIdx});
   }
 
   if (action === 'save_partialroll') {
@@ -766,6 +822,13 @@ function _getYardsReceivedSheet() {
   var sh = ss.getSheetByName(YARDSRECEIVED_TAB);
   if (!sh) { sh = ss.insertSheet(YARDSRECEIVED_TAB); sh.appendRow(YARDSRECEIVED_HEADER); return sh; }
   if (sh.getLastRow() === 0) sh.appendRow(YARDSRECEIVED_HEADER);
+  return sh;
+}
+function _getYardsStockSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(YARDS_STOCK_TAB);
+  if (!sh) { sh = ss.insertSheet(YARDS_STOCK_TAB); sh.appendRow(YARDS_STOCK_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(YARDS_STOCK_HEADER);
   return sh;
 }
 function _getPartialRollsSheet() {
