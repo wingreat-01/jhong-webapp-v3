@@ -1753,8 +1753,8 @@ header{display:none!important}
       </div>
     </div>
 
-    <!-- Row 2: Date + Withdrawal No. (with autocomplete that auto-fills Customer) -->
-    <div class="split-simple-bar" style="margin-top:8px">
+    <!-- Row 2: Date + Withdrawal No. (autocomplete auto-fills Customer) + Customer -->
+    <div class="split-simple-bar" style="margin-top:8px;align-items:flex-start">
       <div style="flex:0 0 160px;display:flex;flex-direction:column;gap:3px">
         <label for="splitDateVisible" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">DATE</label>
         <input type="date" id="splitDateVisible" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box" oninput="document.getElementById(&#39;splitDate&#39;).value=this.value">
@@ -1764,10 +1764,14 @@ header{display:none!important}
         <input type="text" id="splitWhdlNo" placeholder="e.g. CO-26-0384" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box" oninput="onSplitWhdlNoInput()" onkeydown="onSplitWhdlNoKey(event)" onblur="setTimeout(hideSplitWhdlNoAC,180)">
         <div class="ac-list" id="splitWhdlNoAcList" style="z-index:10020"></div>
       </div>
+      <div style="flex:1 1 200px;min-width:160px;display:flex;flex-direction:column;gap:3px">
+        <label for="splitCustomer" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">CUSTOMER</label>
+        <input type="text" id="splitCustomer" placeholder="Internal — Roll Split" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box">
+      </div>
     </div>
 
-    <!-- Row 3: Width + W-UM + Length + L-UM (auto-filled from parent item, editable) -->
-    <div class="split-simple-bar" style="margin-top:8px">
+    <!-- Row 3: Width + W-UM + Length + L-UM + Remarks -->
+    <div class="split-simple-bar" style="margin-top:8px;align-items:flex-start">
       <div style="display:flex;flex-direction:column;gap:3px">
         <label for="splitWidth" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">WIDTH</label>
         <input type="text" id="splitWidth" placeholder="48" style="width:72px;padding:8px 8px;border:1px solid var(--border);border-radius:7px;font-size:13px;text-align:center;background:#F8FAFC;font-family:inherit;box-sizing:border-box">
@@ -1783,14 +1787,6 @@ header{display:none!important}
       <div style="display:flex;flex-direction:column;gap:3px">
         <label for="splitLengthUnit" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">L-UM</label>
         <input type="text" id="splitLengthUnit" placeholder="yds" maxlength="6" style="width:54px;padding:8px 8px;border:1px solid var(--border);border-radius:7px;font-size:13px;text-align:center;background:#F8FAFC;font-family:inherit;box-sizing:border-box">
-      </div>
-    </div>
-
-    <!-- Row 4: Customer + Remarks side by side -->
-    <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
-      <div style="flex:0 0 220px;min-width:180px;display:flex;flex-direction:column;gap:3px">
-        <label for="splitCustomer" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">CUSTOMER</label>
-        <input type="text" id="splitCustomer" placeholder="Internal — Roll Split" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box">
       </div>
       <div style="flex:1 1 200px;min-width:160px;display:flex;flex-direction:column;gap:3px">
         <label for="splitRemarks" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">REMARKS <span style="font-weight:400;color:#90A4AE">(optional)</span></label>
@@ -3600,19 +3596,26 @@ function pickSplitWhdlNo(no, customer) {
   var el = document.getElementById('splitWhdlNo');
   if (el) { el.value = no; }
   hideSplitWhdlNoAC();
-  // Auto-fill Customer when the matched withdrawal carries one. Only overwrite
-  // an empty field OR the default 'Internal — Roll Split' placeholder so the
-  // user's hand-typed customer is preserved.
-  var custEl = document.getElementById('splitCustomer');
-  if (custEl && customer && customer.trim()) {
-    var cur = (custEl.value || '').trim();
-    if (!cur || cur === 'Internal — Roll Split') {
-      custEl.value = customer.trim();
-      custEl.style.transition = 'background 0.3s';
-      custEl.style.background = '#E8F5E9';
-      setTimeout(function() { custEl.style.background = ''; }, 800);
-    }
+  // If the picker didn't pass a customer (e.g. data-customer was empty),
+  // look it up directly from the in-memory cache by withdrawal number so
+  // we still auto-fill whenever the data actually has one.
+  var resolvedCust = (customer && customer.trim()) ? customer.trim() : '';
+  if (!resolvedCust && no) {
+    var lookupNo = String(no).trim().toLowerCase();
+    var src = _whdlNoCached || _whdlBuildFromState();
+    var hit = (src || []).find(function(m){ return (m.no || '').toLowerCase() === lookupNo; });
+    if (hit && hit.customer) resolvedCust = String(hit.customer).trim();
   }
+  // Always overwrite splitCustomer with the resolved customer name — the user
+  // expects clicking a withdrawal-no to populate the customer field.
+  var custEl = document.getElementById('splitCustomer');
+  if (custEl && resolvedCust) {
+    custEl.value = resolvedCust;
+    custEl.style.transition = 'background 0.3s';
+    custEl.style.background = '#E8F5E9';
+    setTimeout(function() { custEl.style.background = ''; }, 800);
+  }
+  console.log('[splitWhdlNo pick] no=', no, 'customer arg=', customer, 'resolved=', resolvedCust);
   // Move focus to the Split button
   var btn = document.getElementById('splitConfirmBtn');
   if (btn && !btn.disabled) btn.focus();
