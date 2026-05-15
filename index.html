@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_75.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_76.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -664,7 +664,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">9/10</span>
+  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
 </div>
 
 <div class="toast" id="toast">Sync complete — 5.6s — 281 items, 242 withdrawals, 25 received, 194 beginning, 0 orders</div>
@@ -6797,30 +6797,59 @@ function postToScript(payload, onSuccess, onError) {
     if (onError) onError('Delete blocked: switch to Admin mode first.');
     return;
   }
-  var sep = proxy.indexOf('?') >= 0 ? '&' : '?';
-  var url = proxy + sep + 'action=' + encodeURIComponent(action)
-          + '&actor=' + encodeURIComponent(STATE._isAdmin ? 'admin' : 'user')
-          + (isDelete ? '&adminPin=' + encodeURIComponent(STATE.config.adminPin || '') : '')
-          + '&payload=' + encodeURIComponent(JSON.stringify(payload));
-  if (url.length > 7500) { if (onError) onError('Payload too large for GET ('+url.length+' chars).'); return; }
-  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  var timer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 15000);
-  fetch(url, {method:'GET', cache:'no-cache', redirect:'follow', signal: ctrl ? ctrl.signal : undefined})
-    .then(function(res){ return res.text(); })
-    .then(function(txt){
-      clearTimeout(timer);
-      var obj = null;
-      try { obj = JSON.parse(txt); } catch(e) {}
-      if (obj && obj.ok) { if (onSuccess) onSuccess(obj); }
-      else {
-        var msg = (obj && obj.error) ? obj.error : (txt ? ('Non-JSON: '+txt.slice(0,200)) : 'Empty response');
-        if (onError) onError(msg);
-      }
+
+  var actor    = STATE._isAdmin ? 'admin' : 'user';
+  var adminPin = isDelete ? (STATE.config.adminPin || '') : '';
+  var sep      = proxy.indexOf('?') >= 0 ? '&' : '?';
+  var getUrl   = proxy + sep + 'action=' + encodeURIComponent(action)
+               + '&actor=' + encodeURIComponent(actor)
+               + (isDelete ? '&adminPin=' + encodeURIComponent(adminPin) : '')
+               + '&payload=' + encodeURIComponent(JSON.stringify(payload));
+
+  var ctrl  = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 25000);
+
+  function _handleText(txt) {
+    clearTimeout(timer);
+    var obj = null;
+    try { obj = JSON.parse(txt); } catch(e) {}
+    if (obj && obj.ok) { if (onSuccess) onSuccess(obj); }
+    else {
+      var msg = (obj && obj.error) ? obj.error : (txt ? ('Non-JSON: ' + txt.slice(0, 200)) : 'Empty response');
+      if (onError) onError(msg);
+    }
+  }
+  function _handleErr(err) {
+    clearTimeout(timer);
+    if (onError) onError(String(err && err.message ? err.message : err));
+  }
+
+  // Use POST automatically when the payload is too large for a GET URL.
+  // This handles save_split (and any future large payload) without hitting
+  // Google Apps Script's URL length limit. doPost() reads JSON body directly.
+  if (getUrl.length > 6000) {
+    var postBody = JSON.stringify(Object.assign({}, payload, {
+      action:   action,
+      _actor:   actor,
+      adminPin: adminPin
+    }));
+    fetch(proxy, {
+      method:   'POST',
+      cache:    'no-cache',
+      redirect: 'follow',
+      headers:  { 'Content-Type': 'application/json' },
+      body:     postBody,
+      signal:   ctrl ? ctrl.signal : undefined
     })
-    .catch(function(err){
-      clearTimeout(timer);
-      if (onError) onError(String(err && err.message ? err.message : err));
-    });
+      .then(function(res){ return res.text(); })
+      .then(_handleText)
+      .catch(_handleErr);
+  } else {
+    fetch(getUrl, {method:'GET', cache:'no-cache', redirect:'follow', signal: ctrl ? ctrl.signal : undefined})
+      .then(function(res){ return res.text(); })
+      .then(_handleText)
+      .catch(_handleErr);
+  }
 }
 
 // ---------- CSV fetcher ----------
