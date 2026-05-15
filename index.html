@@ -1798,6 +1798,9 @@ header{display:none!important}
       </div>
     </div>
 
+    <!-- Child SKU card (shows auto-matched child OR manual picker dropdown) -->
+    <div id="splitChildCard" style="display:none;margin-top:10px"></div>
+
     <!-- Status preview -->
     <div class="split-status-line" id="splitPreviewBox" style="margin-top:10px">Pick a 48" × 50yd parent.</div>
 
@@ -1812,7 +1815,6 @@ header{display:none!important}
     <input type="hidden" id="splitChildPieces" value="2">
     <input type="hidden" id="splitDate" value="">
     <input type="hidden" id="splitNote" value="">
-    <div id="splitChildCard" style="display:none"></div>
   </div>
 </div>
 
@@ -8124,6 +8126,7 @@ function _splitOnParentSelected(code){
     info.title = '⚠ Item not found in ITEMCODE';
     info.className = 'split-avail-pill err';
     card.textContent = '';
+    card.style.display = 'none';
     hidden.value = '';
     _splitRollUpdatePreview();
     return;
@@ -8133,6 +8136,7 @@ function _splitOnParentSelected(code){
     info.title = '⚠ Only 48" × 50yd items can be split — this item is '+(item.size||'(no size)');
     info.className = 'split-avail-pill err';
     card.textContent = '';
+    card.style.display = 'none';
     hidden.value = '';
     _splitRollUpdatePreview();
     return;
@@ -8158,6 +8162,7 @@ function _splitOnParentSelected(code){
     if (all24.length > 0) {
       // Candidates exist but none matched by description \u2014 let user pick manually
       card.className = 'split-child-card warn';
+      card.style.display = '';
       var opts = all24.map(function(c) {
         return '<option value="' + escapeHtml(c.code) + '">'
           + escapeHtml(c.code)
@@ -8173,6 +8178,7 @@ function _splitOnParentSelected(code){
       hidden.value = '';
     } else {
       card.className = 'split-child-card warn';
+      card.style.display = '';
       card.innerHTML = '<span class="scc-code">\u26a0 No 24\u201d \xd7 50yd item in ITEMCODE</span>'
         + '<span class="scc-meta">Add a 24\u201d\xd750yd entry to ITEMCODE, then \u21bb Sync.</span>';
       hidden.value = '';
@@ -8180,6 +8186,7 @@ function _splitOnParentSelected(code){
   } else {
     var cAvail = (typeof availableFor === 'function') ? availableFor(child) : 0;
     card.className = 'split-child-card';
+    card.style.display = '';
     card.innerHTML = '\u2192 Child SKU: <span class="scc-code">' + escapeHtml(child.code) + '</span>'
       + '<span class="scc-meta">' + escapeHtml(child.desc || '')
       + (child.size ? '  \xb7  ' + escapeHtml(child.size) : '')
