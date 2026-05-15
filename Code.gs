@@ -699,54 +699,24 @@ function _handleSaveSplit(sp) {
   var pSizeStr = (pW && pL) ? (pW + (pWU?' '+pWU:'') + ' × ' + pL + (pLU?' '+pLU:'')) : (sp.parentSize || '');
   var cSizeStr = (cW && cL) ? (cW + (cWU?' '+cWU:'') + ' × ' + cL + (cLU?' '+cLU:'')) : (sp.childSize  || '');
 
-  var parentRecId  = String(sp.withdrawalId || '').trim() || _genId('whd');
-  var childRecId   = String(sp.receivedId   || '').trim() || _genId('rec');
   var spParentId   = _genId('spp');
   var spChildId    = _genId('spc');
 
-  var parentRemark = 'Split into ' + cQty + '× ' + cCode + ' [' + splitId + ']' + (sp.note ? '  ·  ' + sp.note : '');
-  var childRemark  = 'From ' + pCode + ' [' + splitId + '] whd:' + parentRecId + (sp.note ? '  ·  ' + sp.note : '');
-
-  // 1. SPLIT-PARENT — dedicated parent deduction log
+  // SPLIT-PARENT — parent roll consumed (treated as a withdrawal from balance
+  // via frontend parseSplitParentRows merging into STATE.withdrawals)
   _getSplitParentSheet().appendRow([
     spDate, splitId, pCode, pDesc, pW, pWU, pL, pLU,
     pQty, whdlNo, customer, note, spParentId, false, '', ''
   ]);
 
-  // 2. SPLIT-CHILD — dedicated child credit log
+  // SPLIT-CHILD — child rolls produced (treated as received items added to
+  // balance via frontend parseSplitChildRows merging into STATE.received)
   _getSplitChildSheet().appendRow([
     spDate, splitId, cCode, cDesc, cW, cWU, cL, cLU,
     cQty, splitId, 'Internal — Roll Split', note, spChildId, false, '', ''
   ]);
 
-  // 3. WITHDRAWAL — stock formula deduction (parent available goes DOWN)
-  var whdSh = _getWithdrawalSheet();
-  if (_findRowById(whdSh, 12, parentRecId) === -1) {
-    whdSh.appendRow([
-      spDate, pCode, pDesc, pW, pWU, pL, pLU,
-      pQty, whdlNo, customer, _safeText(parentRemark),
-      parentRecId, false, '', ''
-    ]);
-  }
-
-  // 4. RECEIVED — stock formula credit (child available goes UP)
-  var recSh = _getReceivedSheet();
-  if (_findRowById(recSh, 9, childRecId) === -1) {
-    recSh.appendRow([
-      spDate, cCode, cDesc, cSizeStr,
-      cQty, splitId, 'Internal — Roll Split', _safeText(childRemark),
-      childRecId, false, '', ''
-    ]);
-  }
-
-  // 5. SPLIT — full audit log linking all records
-  _getSplitSheet().appendRow([
-    spDate, splitId, pCode, pDesc, pSizeStr, pQty,
-    cCode, cDesc, cSizeStr, cQty,
-    parentRecId, childRecId, whdlNo, note
-  ]);
-
-  return _json({ok:true, splitId:splitId, withdrawalId:parentRecId, receivedId:childRecId, splitParentId:spParentId, splitChildId:spChildId});
+  return _json({ok:true, splitId:splitId, splitParentId:spParentId, splitChildId:spChildId});
 }
 
 function _openSS() {

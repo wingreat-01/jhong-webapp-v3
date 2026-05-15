@@ -2416,19 +2416,40 @@ function syncNow(opts) {
     fetchFromAppsScript('read_split_parent',
       function(rows){
         var parsed = parseSplitParentRows(rows || []);
-        if (parsed.length) {
-          // Remove any previously merged split-parent rows, then re-add fresh ones.
-          // They are tagged source:'split-parent' so we can identify and replace them.
-          STATE.withdrawals = (STATE.withdrawals || []).filter(function(w){
-            return w.source !== 'split-parent';
-          });
-          parsed.forEach(function(sp){ STATE.withdrawals.push(sp); });
-          console.log('[split-parent] merged '+parsed.length+' rows into STATE.withdrawals');
-        }
+        // Always replace previously merged split-parent rows even if backend
+        // is now empty, so a deleted/empty SPLIT-PARENT sheet clears stale ones.
+        STATE.withdrawals = (STATE.withdrawals || []).filter(function(w){
+          return w.source !== 'split-parent';
+        });
+        parsed.forEach(function(sp){ STATE.withdrawals.push(sp); });
+        console.log('[split-parent] merged '+parsed.length+' rows into STATE.withdrawals');
         bumpProg(); resolve();
       },
       function(err){
         console.warn('read_split_parent:', err);
+        bumpProg(); resolve();
+      }
+    );
+  }));
+
+  // ── SPLIT-CHILD → merge into STATE.received so sumReceivedFor credits splits ──
+  // SPLIT-CHILD rows record every batch of child rolls produced during a split.
+  // Without this, availableFor() ignores splits and child stock never increases.
+  total++;
+  jobs.push(new Promise(function(resolve){
+    if (!STATE.config.proxyUrl) { bumpProg(); resolve(); return; }
+    fetchFromAppsScript('read_split_child',
+      function(rows){
+        var parsed = parseSplitChildRows(rows || []);
+        STATE.received = (STATE.received || []).filter(function(r){
+          return r.source !== 'split-child';
+        });
+        parsed.forEach(function(sc){ STATE.received.push(sc); });
+        console.log('[split-child] merged '+parsed.length+' rows into STATE.received');
+        bumpProg(); resolve();
+      },
+      function(err){
+        console.warn('read_split_child:', err);
         bumpProg(); resolve();
       }
     );
@@ -2757,6 +2778,62 @@ function parseSplitParentRows(rows) {
       customer:     String(r[iCust]||'').trim(),
       remarks:      String(r[iNote]||'').trim(),
       source:       'split-parent'   // tagged so sync can replace stale entries
+    });
+  }
+  return out;
+}
+
+// ---------- SPLIT-CHILD rows → received-shaped objects ----------
+// SPLIT-CHILD header: Date(0), SplitID(1), ItemCode(2), Description(3),
+//   Width(4), W-UM(5), Length(6), L-UM(7), Qty(8), MRRNo(9),
+//   Supplier(10), Note(11), ID(12), Deleted(13), DeletedAt(14), DeletedBy(15)
+// These are merged into STATE.received so sumReceivedFor() counts them
+// and availableFor() correctly credits split-produced child rolls to stock.
+function parseSplitChildRows(rows) {
+  if (!rows || rows.length < 2) return [];
+  var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
+  function col1(names) {
+    for (var i = 0; i < names.length; i++) {
+      var idx = header.indexOf(names[i]);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+  var iDate  = col1(['date']);                              if (iDate  < 0) iDate  = 0;
+  var iCode  = col1(['itemcode','item code','code']);       if (iCode  < 0) iCode  = 2;
+  var iDesc  = col1(['description','desc']);                if (iDesc  < 0) iDesc  = 3;
+  var iWidth = col1(['width']);                             if (iWidth < 0) iWidth = 4;
+  var iWUnit = col1(['w-um','wum']);                        if (iWUnit < 0) iWUnit = 5;
+  var iLen   = col1(['length']);                            if (iLen   < 0) iLen   = 6;
+  var iLUnit = col1(['l-um','lum']);                        if (iLUnit < 0) iLUnit = 7;
+  var iQty   = col1(['qty','quantity']);                    if (iQty   < 0) iQty   = 8;
+  var iMrr   = col1(['mrrno','mrr no','mrr','splitid']);    if (iMrr   < 0) iMrr   = 9;
+  var iSup   = col1(['supplier']);                          if (iSup   < 0) iSup   = 10;
+  var iNote  = col1(['note','notes','remarks']);            if (iNote  < 0) iNote  = 11;
+  var iId    = col1(['id']);                                if (iId    < 0) iId    = 12;
+  var iDel   = col1(['deleted']);                           if (iDel   < 0) iDel   = 13;
+  var out = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (_isDeletedFlag(r[iDel])) continue;
+    var code = String(r[iCode]||'').trim();
+    if (!code) continue;
+    var rawId = String(r[iId]||'').trim() || ('spc_r'+(i+1)+'_'+code.replace(/[^A-Za-z0-9]/g,'').slice(0,8));
+    var _wRaw  = String(r[iWidth]||'').trim();
+    var _wuRaw = String(r[iWUnit]||'').trim();
+    var _lRaw  = String(r[iLen]  ||'').trim();
+    var _luRaw = String(r[iLUnit]||'').trim();
+    out.push({
+      id:        rawId,
+      date:      formatRawDate(String(r[iDate]||'')),
+      itemCode:  code,
+      desc:      String(r[iDesc]||'').trim(),
+      size:      _wRaw && _lRaw ? _wRaw+(_wuRaw?' '+_wuRaw:'')+' × '+_lRaw+(_luRaw?' '+_luRaw:'') : (_wRaw||''),
+      qty:       parseFloat(r[iQty])||0,
+      mrrNo:     String(r[iMrr]||'').trim(),
+      supplier:  String(r[iSup]||'').trim() || 'Internal — Roll Split',
+      remarks:   String(r[iNote]||'').trim(),
+      source:    'split-child'   // tagged so sync can replace stale entries
     });
   }
   return out;
@@ -8299,12 +8376,14 @@ function confirmSplitRoll(){
     document.getElementById('splitDate').value = date;
   }
 
-  // ── Cross-reference IDs so every record links back to the others ──────────
-  var pRecId = 'whd_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
-  var cRecId = 'rec_' + (Date.now() + 1) + '_' + Math.random().toString(36).substr(2,5);
+  // Local IDs — only used until next sync replaces these with the backend
+  // SPLIT-PARENT/SPLIT-CHILD rows tagged 'spp_*' / 'spc_*'.
+  var pRecId = 'spp_local_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+  var cRecId = 'spc_local_' + (Date.now() + 1) + '_' + Math.random().toString(36).substr(2,5);
 
-  // ── 1) WITHDRAWAL — parent 48" roll consumed ──────────────────────────────
-  // Stock effect: sumWithdrawnFor(pCode) increases → parent available decreases.
+  // ── 1) Parent consumption — pushed into STATE.withdrawals tagged
+  // 'split-parent' so sumWithdrawnFor() deducts it from balance. The actual
+  // persistence happens in the SPLIT-PARENT backend tab (not WITHDRAWAL).
   var pRec = {
     id:          pRecId,
     date:        date,
@@ -8318,15 +8397,14 @@ function confirmSplitRoll(){
     qty:         pQty,
     withdrawalNo: whdlNo,
     customer:    splitCustomer,
-    // Remarks carry the split ID and the child received ID so the row is
-    // self-contained and traceable without opening the SPLIT tab.
     remarks:     'Split into ' + addQty + '× ' + cCode + ' [' + splitId + ']'
                  + (note ? '  ·  ' + note : ''),
-    source:      'pending'
+    source:      'split-parent'
   };
   STATE.withdrawals.unshift(pRec);
 
-  // ── 2) RECEIVED — child rolls credited to stock (local state) ────────────
+  // ── 2) Child credit — pushed into STATE.received tagged 'split-child'
+  // so sumReceivedFor() adds it to balance. Persisted to SPLIT-CHILD tab.
   var cRec = {
     id:       cRecId,
     date:     date,
@@ -8339,9 +8417,9 @@ function confirmSplitRoll(){
     qty:      addQty,
     mrrNo:    splitId,
     supplier: 'Internal — Roll Split',
-    remarks:  'From ' + pCode + ' [' + splitId + '] whd:' + pRecId
+    remarks:  'From ' + pCode + ' [' + splitId + ']'
               + (note ? '  ·  ' + note : ''),
-    source:   'pending'
+    source:   'split-child'
   };
   STATE.received.unshift(cRec);
 
@@ -8391,19 +8469,18 @@ function confirmSplitRoll(){
 
   postToScript({action: 'save_split', record: splitRec},
     function(res) {
-      if (res && res.withdrawalId) pRec.id = res.withdrawalId;
-      if (res && res.receivedId)   cRec.id = res.receivedId;
-      pRec.source = 'backend';
-      cRec.source = 'backend';
+      // Adopt the backend-assigned IDs so the next sync's tagged-source
+      // replacement matches cleanly without double rows.
+      if (res && res.splitParentId) pRec.id = res.splitParentId;
+      if (res && res.splitChildId)  cRec.id = res.splitChildId;
       saveState();
       try { renderHistory();  } catch(e){}
       try { renderReceived(); } catch(e){}
       try { renderStocks();   } catch(e){}
-      showToast('✓ Split ' + splitId + ' synced → SPLIT-PARENT + SPLIT-CHILD + WITHDRAWAL + RECEIVED + SPLIT tabs.', 'success');
+      showToast('✓ Split ' + splitId + ' synced → SPLIT-PARENT + SPLIT-CHILD.', 'success');
     },
     function(err) {
-      pRec.source = 'local';
-      cRec.source = 'local';
+      // Keep local source tags; next successful sync will replace them.
       saveState();
       showToast('Split saved locally — backend sync failed: ' + err, 'error');
     }
