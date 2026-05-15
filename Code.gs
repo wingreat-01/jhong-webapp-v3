@@ -1342,18 +1342,20 @@ function _writeStockMonitorContent(ss, sh) {
   sh.setColumnWidth(9, 120);  // Status
 
   // ── Reset frozen state + clear any existing merges from a previous run ──
-  // Sheets refuses to merge across the frozen/non-frozen column boundary,
-  // so frozen columns must be cleared before we re-apply the title merges.
+  // We avoid merging row 1-2 because (a) merging across cols 1-9 conflicts with
+  // freezing column 1, and (b) the green background already spans the whole row
+  // via setBackground, so the banner reads as one block without an actual merge.
+  // Text in A1/A2 naturally overflows into the empty cells to the right.
   sh.setFrozenRows(0);
   sh.setFrozenColumns(0);
   sh.getRange(1, 1, 2, maxCols).breakApart();
 
-  // ── Title row: merge across all 9 cols ──
-  sh.getRange(1, 1, 1, maxCols).merge().setFontSize(13);
-  sh.getRange(2, 1, 1, maxCols).merge().setFontSize(10).setFontStyle('italic');
+  // Title formatting — no merge, just font tweaks anchored at A1/A2
+  sh.getRange(1, 1).setFontSize(13);
+  sh.getRange(2, 1).setFontSize(10).setFontStyle('italic');
 
-  // ── Freeze header rows AFTER the merges land (title + refreshed + blank
-  //    + section header = 4 rows, then col header = row 5). ──
+  // ── Freeze header rows (title + refreshed + blank + section header = 4 rows,
+  //    then col header = row 5). Safe now because no row crosses col 1. ──
   sh.setFrozenRows(5);
   sh.setFrozenColumns(1);
 
