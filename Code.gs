@@ -535,112 +535,9 @@ function _handleWrite(body) {
     return _json({ok:true, code: ab.code, qty: abQty, row: absh.getLastRow()});
   }
 
-  // ===== SPLIT (atomic — writes all 5 records in one call) =====
-  // Flow:
-  //   1. SPLIT-PARENT → dedicated deduction log (new tab)
-  //   2. SPLIT-CHILD  → dedicated credit log     (new tab)
-  //   3. WITHDRAWAL   → stock formula deduction  (parent available goes DOWN)
-  //   4. RECEIVED     → stock formula credit     (child available goes UP)
-  //   5. SPLIT        → audit log linking all records
-  //
-  // Stock formula (frontend + STOCKS_MONITOR):
-  //   available = origQty + beginning + received − withdrawn
+  // ===== SPLIT (delegates to dedicated function to avoid var-hoisting collisions) =====
   if (action === 'save_split') {
-    var sp = body.record || {};
-    if (!sp.parentCode) return _json({ok:false, error:'Missing parentCode'});
-    if (!sp.childCode)  return _json({ok:false, error:'Missing childCode'});
-
-    var tz     = Session.getScriptTimeZone() || 'Asia/Manila';
-    var spDate = sp.date || Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-    var splitId   = String(sp.splitId   || _genId('SPLIT'));
-    var whdlNo    = String(sp.withdrawalNo || splitId);
-    var customer  = String(sp.customer  || 'Internal \u2014 Roll Split');
-    var note      = _safeText(sp.note   || '');
-    var pCode     = String(sp.parentCode);
-    var pDesc     = String(sp.parentDesc  || '');
-    var cCode     = String(sp.childCode);
-    var cDesc     = String(sp.childDesc   || '');
-    var pQty      = Number(sp.parentQty)  || 1;
-    var cQty      = Number(sp.childQty)   || (pQty * 2);
-
-    // Parse parent dimensions — prefer explicit fields, fall back to parentSize string
-    var _pW  = String(sp.parentWidth      || '').trim();
-    var _pWU = String(sp.parentWidthUnit  || '').trim();
-    var _pL  = String(sp.parentLength     || '').trim();
-    var _pLU = String(sp.parentLengthUnit || '').trim();
-    if (!_pW && !_pL && sp.parentSize) {
-      var _psm = String(sp.parentSize).match(/^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX\u00d7]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/);
-      if (_psm) { _pW = _psm[1]||''; _pWU = _psm[2]||''; _pL = _psm[3]||''; _pLU = _psm[4]||''; }
-      else { _pW = String(sp.parentSize); }
-    }
-
-    // Parse child dimensions — prefer explicit fields, fall back to childSize string
-    var _cW  = String(sp.childWidth      || '').trim();
-    var _cWU = String(sp.childWidthUnit  || '').trim();
-    var _cL  = String(sp.childLength     || '').trim();
-    var _cLU = String(sp.childLengthUnit || '').trim();
-    if (!_cW && !_cL && sp.childSize) {
-      var _csm = String(sp.childSize).match(/^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX\u00d7]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/);
-      if (_csm) { _cW = _csm[1]||''; _cWU = _csm[2]||''; _cL = _csm[3]||''; _cLU = _csm[4]||''; }
-      else { _cW = String(sp.childSize); }
-    }
-
-    // Size display strings
-    var pSizeStr = (_pW && _pL) ? (_pW + (_pWU?' '+_pWU:'') + ' \u00d7 ' + _pL + (_pLU?' '+_pLU:'')) : (sp.parentSize || '');
-    var cSizeStr = (_cW && _cL) ? (_cW + (_cWU?' '+_cWU:'') + ' \u00d7 ' + _cL + (_cLU?' '+_cLU:'')) : (sp.childSize  || '');
-
-    // Stable IDs for cross-referencing
-    var parentRecId = String(sp.withdrawalId || '').trim() || _genId('whd');
-    var childRecId  = String(sp.receivedId   || '').trim() || _genId('rec');
-    var spParentId  = _genId('spp');
-    var spChildId   = _genId('spc');
-
-    var parentRemark = 'Split into ' + cQty + '\u00d7 ' + cCode + ' [' + splitId + ']' + (sp.note ? '  \u00b7  ' + sp.note : '');
-    var childRemark  = 'From ' + pCode + ' [' + splitId + '] whd:' + parentRecId + (sp.note ? '  \u00b7  ' + sp.note : '');
-
-    // ── 1. SPLIT-PARENT (dedicated deduction log) ────────────────────
-    var spParentSh = _getSplitParentSheet();
-    spParentSh.appendRow([
-      spDate, splitId, pCode, pDesc, _pW, _pWU, _pL, _pLU,
-      pQty, whdlNo, customer, note, spParentId, false, '', ''
-    ]);
-
-    // ── 2. SPLIT-CHILD (dedicated credit log) ───────────────────────
-    var spChildSh = _getSplitChildSheet();
-    spChildSh.appendRow([
-      spDate, splitId, cCode, cDesc, _cW, _cWU, _cL, _cLU,
-      cQty, splitId, 'Internal \u2014 Roll Split', note, spChildId, false, '', ''
-    ]);
-
-    // ── 3. WITHDRAWAL (stock formula deduction — parent available ↓) ─
-    var whdSh = _getWithdrawalSheet();
-    if (_findRowById(whdSh, 12, parentRecId) === -1) {
-      whdSh.appendRow([
-        spDate, pCode, pDesc, _pW, _pWU, _pL, _pLU,
-        pQty, whdlNo, customer, _safeText(parentRemark),
-        parentRecId, false, '', ''
-      ]);
-    }
-
-    // ── 4. RECEIVED (stock formula credit — child available ↑) ───────
-    var recSh = _getReceivedSheet();
-    if (_findRowById(recSh, 9, childRecId) === -1) {
-      recSh.appendRow([
-        spDate, cCode, cDesc, cSizeStr,
-        cQty, splitId, 'Internal \u2014 Roll Split', _safeText(childRemark),
-        childRecId, false, '', ''
-      ]);
-    }
-
-    // ── 5. SPLIT (audit log linking all records) ─────────────────────
-    var spsh = _getSplitSheet();
-    spsh.appendRow([
-      spDate, splitId, pCode, pDesc, pSizeStr, pQty,
-      cCode, cDesc, cSizeStr, cQty,
-      parentRecId, childRecId, whdlNo, note
-    ]);
-
-    return _json({ok:true, splitId:splitId, withdrawalId:parentRecId, receivedId:childRecId, splitParentId:spParentId, splitChildId:spChildId});
+    return _handleSaveSplit(body.record || {});
   }
 
   // ===== SERVED =====
@@ -751,6 +648,105 @@ function _handleWrite(body) {
   }
 
   return _json({ok:false, error:'Unknown action: '+action});
+}
+
+// =====================================================================
+// SPLIT handler — extracted into its own function to give it a clean
+// variable scope. Apps Script uses ES5 var-hoisting: all var declarations
+// inside _handleWrite share one scope, so re-using names like sp, sh,
+// existing etc. causes silent collisions that corrupt values mid-execution.
+// Putting save_split here fixes that completely.
+// =====================================================================
+function _handleSaveSplit(sp) {
+  if (!sp.parentCode) return _json({ok:false, error:'Missing parentCode'});
+  if (!sp.childCode)  return _json({ok:false, error:'Missing childCode'});
+
+  var tz        = Session.getScriptTimeZone() || 'Asia/Manila';
+  var spDate    = sp.date || Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var splitId   = String(sp.splitId      || _genId('SPLIT'));
+  var whdlNo    = String(sp.withdrawalNo || splitId);
+  var customer  = String(sp.customer     || 'Internal — Roll Split');
+  var note      = _safeText(sp.note      || '');
+  var pCode     = String(sp.parentCode);
+  var pDesc     = String(sp.parentDesc   || '');
+  var cCode     = String(sp.childCode);
+  var cDesc     = String(sp.childDesc    || '');
+  var pQty      = Number(sp.parentQty)   || 1;
+  var cQty      = Number(sp.childQty)    || (pQty * 2);
+
+  // Parse parent dimensions — prefer explicit fields, fall back to parentSize string
+  var pW  = String(sp.parentWidth      || '').trim();
+  var pWU = String(sp.parentWidthUnit  || '').trim();
+  var pL  = String(sp.parentLength     || '').trim();
+  var pLU = String(sp.parentLengthUnit || '').trim();
+  if (!pW && !pL && sp.parentSize) {
+    var psm = String(sp.parentSize).match(/^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/);
+    if (psm) { pW = psm[1]||''; pWU = psm[2]||''; pL = psm[3]||''; pLU = psm[4]||''; }
+    else { pW = String(sp.parentSize); }
+  }
+
+  // Parse child dimensions — prefer explicit fields, fall back to childSize string
+  var cW  = String(sp.childWidth      || '').trim();
+  var cWU = String(sp.childWidthUnit  || '').trim();
+  var cL  = String(sp.childLength     || '').trim();
+  var cLU = String(sp.childLengthUnit || '').trim();
+  if (!cW && !cL && sp.childSize) {
+    var csm = String(sp.childSize).match(/^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX×]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/);
+    if (csm) { cW = csm[1]||''; cWU = csm[2]||''; cL = csm[3]||''; cLU = csm[4]||''; }
+    else { cW = String(sp.childSize); }
+  }
+
+  var pSizeStr = (pW && pL) ? (pW + (pWU?' '+pWU:'') + ' × ' + pL + (pLU?' '+pLU:'')) : (sp.parentSize || '');
+  var cSizeStr = (cW && cL) ? (cW + (cWU?' '+cWU:'') + ' × ' + cL + (cLU?' '+cLU:'')) : (sp.childSize  || '');
+
+  var parentRecId  = String(sp.withdrawalId || '').trim() || _genId('whd');
+  var childRecId   = String(sp.receivedId   || '').trim() || _genId('rec');
+  var spParentId   = _genId('spp');
+  var spChildId    = _genId('spc');
+
+  var parentRemark = 'Split into ' + cQty + '× ' + cCode + ' [' + splitId + ']' + (sp.note ? '  ·  ' + sp.note : '');
+  var childRemark  = 'From ' + pCode + ' [' + splitId + '] whd:' + parentRecId + (sp.note ? '  ·  ' + sp.note : '');
+
+  // 1. SPLIT-PARENT — dedicated parent deduction log
+  _getSplitParentSheet().appendRow([
+    spDate, splitId, pCode, pDesc, pW, pWU, pL, pLU,
+    pQty, whdlNo, customer, note, spParentId, false, '', ''
+  ]);
+
+  // 2. SPLIT-CHILD — dedicated child credit log
+  _getSplitChildSheet().appendRow([
+    spDate, splitId, cCode, cDesc, cW, cWU, cL, cLU,
+    cQty, splitId, 'Internal — Roll Split', note, spChildId, false, '', ''
+  ]);
+
+  // 3. WITHDRAWAL — stock formula deduction (parent available goes DOWN)
+  var whdSh = _getWithdrawalSheet();
+  if (_findRowById(whdSh, 12, parentRecId) === -1) {
+    whdSh.appendRow([
+      spDate, pCode, pDesc, pW, pWU, pL, pLU,
+      pQty, whdlNo, customer, _safeText(parentRemark),
+      parentRecId, false, '', ''
+    ]);
+  }
+
+  // 4. RECEIVED — stock formula credit (child available goes UP)
+  var recSh = _getReceivedSheet();
+  if (_findRowById(recSh, 9, childRecId) === -1) {
+    recSh.appendRow([
+      spDate, cCode, cDesc, cSizeStr,
+      cQty, splitId, 'Internal — Roll Split', _safeText(childRemark),
+      childRecId, false, '', ''
+    ]);
+  }
+
+  // 5. SPLIT — full audit log linking all records
+  _getSplitSheet().appendRow([
+    spDate, splitId, pCode, pDesc, pSizeStr, pQty,
+    cCode, cDesc, cSizeStr, cQty,
+    parentRecId, childRecId, whdlNo, note
+  ]);
+
+  return _json({ok:true, splitId:splitId, withdrawalId:parentRecId, receivedId:childRecId, splitParentId:spParentId, splitChildId:spChildId});
 }
 
 function _openSS() {
