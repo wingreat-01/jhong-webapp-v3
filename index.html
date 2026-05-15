@@ -6840,7 +6840,9 @@ function _readReceivedWithBackfill(done, failed) {
               function(rows2){
                 var parsed2 = parseReceivedRows(rows2);
                 if (parsed2) {
-                  var local2 = STATE.received.filter(function(r){ return r.source === 'local'; });
+                  // Preserve split-child records (loaded by the separate
+                  // read_split_child job) so the concurrent jobs don't race.
+                  var local2 = STATE.received.filter(function(r){ return r.source === 'local' || r.source === 'split-child'; });
                   STATE.received = parsed2.concat(local2);
                   try { renderReceived(); renderStocks(); } catch(e){}
                 }
@@ -6854,7 +6856,7 @@ function _readReceivedWithBackfill(done, failed) {
             // Backfill failed — fall back to whatever we already parsed so the UI works.
             console.warn('backfill_received_ids failed:', err);
             if (parsed) {
-              var local = STATE.received.filter(function(r){ return r.source === 'local'; });
+              var local = STATE.received.filter(function(r){ return r.source === 'local' || r.source === 'split-child'; });
               STATE.received = parsed.concat(local);
               try { renderReceived(); renderStocks(); } catch(e){}
             }
@@ -6865,7 +6867,7 @@ function _readReceivedWithBackfill(done, failed) {
       }
       // Normal path — no legacy rows or already attempted backfill.
       if (parsed) {
-        var local = STATE.received.filter(function(r){ return r.source === 'local'; });
+        var local = STATE.received.filter(function(r){ return r.source === 'local' || r.source === 'split-child'; });
         STATE.received = parsed.concat(local);
         try { renderReceived(); renderStocks(); } catch(e){}
       }
@@ -6913,7 +6915,9 @@ function _readWithdrawalsWithBackfill(done, failed) {
                 var parsed2 = parseWithdrawalRows(rows2);
                 if (parsed2) {
                   parsed2 = _filterPendingDeletes(parsed2);
-                  var localW2 = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
+                  // Preserve split-parent records (loaded by the separate
+                  // read_split_parent job) so concurrent jobs don't race.
+                  var localW2 = STATE.withdrawals.filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
                   STATE.withdrawals = parsed2.concat(localW2);
                   try { renderHistory(); renderStocks(); } catch(e){}
                 }
@@ -6927,7 +6931,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
             console.warn('backfill_withdrawal_ids failed:', err);
             if (parsed) {
               parsed = _filterPendingDeletes(parsed);
-              var localWe = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
+              var localWe = STATE.withdrawals.filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
               STATE.withdrawals = parsed.concat(localWe);
               try { renderHistory(); renderStocks(); } catch(e){}
             }
@@ -6938,7 +6942,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
       }
       if (parsed) {
         parsed = _filterPendingDeletes(parsed);
-        var localW = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
+        var localW = STATE.withdrawals.filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
         STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); renderStocks(); } catch(e){}
       }
@@ -7204,7 +7208,10 @@ function _wdrawAutoRefreshTick() {
         // Strip any row the user just deleted — prevents ghost-record reappearance
         // while the delete_withdrawal request is still in-flight to the backend.
         parsed = _filterPendingDeletes(parsed);
-        var localW = (STATE.withdrawals || []).filter(function(r){ return r.source === 'local'; });
+        // Preserve local AND split-parent records — the auto-refresh only
+        // owns 'backend' rows from the WITHDRAWAL tab. Split-parent rows
+        // live in the SPLIT-PARENT tab and are owned by their own sync job.
+        var localW = (STATE.withdrawals || []).filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
         STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); } catch(e){}
         try { renderStocks();  } catch(e){}
