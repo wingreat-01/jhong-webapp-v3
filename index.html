@@ -8154,12 +8154,29 @@ function _splitOnParentSelected(code){
 
   var child = _splitFindChildFor(item);
   if (!child) {
-    card.className = 'split-child-card warn';
-    card.innerHTML = '<span class="scc-code">\u26a0 No matching 24\u201d \xd7 50yd child SKU found</span>'
-      + '<span class="scc-meta">Add a 24\u201d\xd750yd item whose description matches &ldquo;'
-      + escapeHtml(item.desc || item.code)
-      + '&rdquo; in ITEMCODE, then \u21bb Sync.</span>';
-    hidden.value = '';
+    var all24 = (STATE.items || []).filter(_splitIs24x50);
+    if (all24.length > 0) {
+      // Candidates exist but none matched by description \u2014 let user pick manually
+      card.className = 'split-child-card warn';
+      var opts = all24.map(function(c) {
+        return '<option value="' + escapeHtml(c.code) + '">'
+          + escapeHtml(c.code)
+          + (c.desc ? ' \u2014 ' + escapeHtml(c.desc) : '')
+          + (c.size ? ' (' + escapeHtml(c.size) + ')' : '')
+          + '</option>';
+      }).join('');
+      card.innerHTML = '<span class="scc-code" style="display:block;margin-bottom:6px;font-size:12px">No auto-match \u2014 select child SKU:</span>'
+        + '<select id="splitChildManualSelect" style="width:100%;padding:6px 8px;border:1px solid #FFB74D;border-radius:6px;font-size:12px;font-family:inherit;background:#fff" onchange="document.getElementById(\'splitChildCode\').value=this.value;_splitRollUpdatePreview()">'
+        + '<option value="">\u2014 select 24\u201d \xd7 50yd item \u2014</option>'
+        + opts
+        + '</select>';
+      hidden.value = '';
+    } else {
+      card.className = 'split-child-card warn';
+      card.innerHTML = '<span class="scc-code">\u26a0 No 24\u201d \xd7 50yd item in ITEMCODE</span>'
+        + '<span class="scc-meta">Add a 24\u201d\xd750yd entry to ITEMCODE, then \u21bb Sync.</span>';
+      hidden.value = '';
+    }
   } else {
     var cAvail = (typeof availableFor === 'function') ? availableFor(child) : 0;
     card.className = 'split-child-card';
@@ -8200,7 +8217,10 @@ function _splitRollUpdatePreview(){
     return;
   }
   if (!cCode) {
-    box.textContent = '⚠ No matching 24" × 50yd child SKU in ITEMCODE.';
+    var _has24 = (STATE.items || []).some(_splitIs24x50);
+    box.textContent = _has24
+      ? 'Select the 24" × 50yd child SKU above to continue.'
+      : '⚠ No 24" × 50yd item found in ITEMCODE — add one and Sync.';
     box.className = 'split-status-line err';
     return;
   }
