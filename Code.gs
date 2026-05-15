@@ -223,18 +223,40 @@ function _handleWrite(body) {
 
   if (action === 'delete_withdrawal') {
     // HARD delete — permanently removes the row from the WITHDRAWAL sheet.
-    // Supports two modes:
-    //   1. id-based (preferred): finds the row by scanning column I for the ID.
-    //   2. sheetRow-based (legacy fallback): used when the row has no ID in
-    //      column I (pre-dates the ID column). The frontend sends the 1-based
-    //      row number it read from the sheet so we can delete it directly.
+    // Supports three modes:
+    //   1. id-based (preferred): finds the row by scanning column 12 for the ID.
+    //   2. full-row scan (corruption recovery): if the col-12 scan misses, every
+    //      cell in every data row is checked. This catches pre-fix split records
+    //      where broken field mapping wrote the ID into the wrong column (e.g. the
+    //      ID landed in the WIDTH cell instead of the ID cell). Without this, those
+    //      ghost rows are undeletable from the UI even with ADMIN access.
+    //   3. sheetRow-based (legacy fallback): used when the row has no ID at all
+    //      (pre-dates the ID column). The frontend sends the 1-based row number.
     var sh = _getWithdrawalSheet();
     var rowIdx = -1;
     var did = String(body.id || '').trim();
     if (did) {
+      // Mode 1 — fast scan of the ID column only
       rowIdx = _findRowById(sh, 12, did);
+      // Mode 2 — corruption-recovery: full-grid scan when col-12 misses
+      if (rowIdx === -1) {
+        var lastR = sh.getLastRow();
+        var lastC = sh.getLastColumn();
+        if (lastR >= 2 && lastC >= 1) {
+          var allData = sh.getRange(2, 1, lastR - 1, lastC).getValues();
+          outer: for (var ri = 0; ri < allData.length; ri++) {
+            for (var ci = 0; ci < allData[ri].length; ci++) {
+              if (String(allData[ri][ci]).trim() === did) {
+                rowIdx = ri + 2; // convert 0-based data index → 1-based sheet row
+                break outer;
+              }
+            }
+          }
+        }
+      }
       if (rowIdx === -1) return _json({ok:false, error:'Withdrawal not found: '+did});
     } else {
+      // Mode 3 — sheetRow fallback for truly ID-less legacy rows
       var sr = parseInt(body.sheetRow, 10);
       if (!sr || sr < 2) return _json({ok:false, error:'Missing id or valid sheetRow for delete_withdrawal'});
       if (sr > sh.getLastRow()) return _json({ok:false, error:'sheetRow '+sr+' out of range'});
