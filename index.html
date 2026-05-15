@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_65.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_67.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -664,7 +664,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">9/10</span>
+  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
 </div>
 
 <div class="toast" id="toast">Sync complete — 5.6s — 281 items, 242 withdrawals, 25 received, 194 beginning, 0 orders</div>
@@ -3659,6 +3659,12 @@ function deleteWithdrawal(id) {
   var r = STATE.withdrawals[idx];
   if (!confirm('Delete this withdrawal?\n\nItem: '+r.itemCode+'\nQty: '+r.qty+'\nDate: '+r.date+'\nWithdrawal No: '+(r.withdrawalNo||'—'))) return;
 
+  // Mark as pending-delete BEFORE splice so the auto-refresh tick can filter
+  // it out while the backend delete request is in-flight. Without this guard
+  // a 30-second auto-refresh racing the delete response causes the row to
+  // reappear ("ghost record") even though the local splice already removed it.
+  _wdrawPendingDeletes[String(id)] = Date.now();
+
   STATE.withdrawals.splice(idx, 1);
   // Also remove any associated partial roll record
   STATE.partialRolls = (STATE.partialRolls || []).filter(function(pr){ return pr.withdrawalId !== id; });
@@ -3671,9 +3677,10 @@ function deleteWithdrawal(id) {
       // Legacy row: no ID in column I, but we know its sheet row number.
       // Send sheetRow so the backend can delete it directly.
       postToScript({action:'delete_withdrawal', sheetRow: r._sheetRow},
-        function(){ /* deleted */ },
-        function(err){ showToast('Deleted locally — backend delete failed: '+err+'. Remove row '+(r._sheetRow||'?')+' manually from the WITHDRAWAL sheet.', 'error'); });
+        function(){ delete _wdrawPendingDeletes[String(id)]; },
+        function(err){ delete _wdrawPendingDeletes[String(id)]; showToast('Deleted locally — backend delete failed: '+err+'. Remove row '+(r._sheetRow||'?')+' manually from the WITHDRAWAL sheet.', 'error'); });
     } else {
+      delete _wdrawPendingDeletes[String(id)];
       showToast('Deleted locally only — this row has no backend ID and no row number. Remove it manually from the WITHDRAWAL sheet.', 'error');
     }
     return;
@@ -3681,9 +3688,10 @@ function deleteWithdrawal(id) {
 
   if (r.source === 'backend' || r.source === 'pending') {
     postToScript({action:'delete_withdrawal', id: id},
-      function(){ /* success toast suppressed per user request */ },
-      function(err){ showToast('Deleted locally — backend delete failed: '+err, 'error'); });
+      function(){ delete _wdrawPendingDeletes[String(id)]; /* success */ },
+      function(err){ delete _wdrawPendingDeletes[String(id)]; showToast('Deleted locally — backend delete failed: '+err, 'error'); });
   } else {
+    delete _wdrawPendingDeletes[String(id)];
     showToast('Deleted (local only)', 'success');
   }
 }
@@ -6679,6 +6687,26 @@ function _readReceivedWithBackfill(done, failed) {
     });
 }
 
+// Helper: strip any IDs still in the pending-delete set from a freshly-parsed list.
+// Prevents ghost-record reappearance when a sync fires while delete_withdrawal
+// is still in-flight to the backend.
+function _filterPendingDeletes(parsed) {
+  var pendingIds = Object.keys(_wdrawPendingDeletes || {});
+  if (!pendingIds.length) return parsed;
+  // Expire entries older than 2 minutes so permanently-failed deletes don't
+  // cause rows to vanish forever.
+  var now = Date.now();
+  pendingIds = pendingIds.filter(function(pid) {
+    if (now - _wdrawPendingDeletes[pid] > 120000) {
+      delete _wdrawPendingDeletes[pid];
+      return false;
+    }
+    return true;
+  });
+  if (!pendingIds.length) return parsed;
+  return parsed.filter(function(w) { return pendingIds.indexOf(String(w.id)) === -1; });
+}
+
 function _readWithdrawalsWithBackfill(done, failed) {
   fetchFromAppsScript('read_withdrawals',
     function(rows){
@@ -6693,6 +6721,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
               function(rows2){
                 var parsed2 = parseWithdrawalRows(rows2);
                 if (parsed2) {
+                  parsed2 = _filterPendingDeletes(parsed2);
                   var localW2 = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
                   STATE.withdrawals = parsed2.concat(localW2);
                   try { renderHistory(); renderStocks(); } catch(e){}
@@ -6706,6 +6735,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
           function(err){
             console.warn('backfill_withdrawal_ids failed:', err);
             if (parsed) {
+              parsed = _filterPendingDeletes(parsed);
               var localWe = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
               STATE.withdrawals = parsed.concat(localWe);
               try { renderHistory(); renderStocks(); } catch(e){}
@@ -6716,6 +6746,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
         return;
       }
       if (parsed) {
+        parsed = _filterPendingDeletes(parsed);
         var localW = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
         STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); renderStocks(); } catch(e){}
@@ -6932,6 +6963,7 @@ function _dedupeWithdrawals(arr) {
 
 var _wdrawAutoRefreshMs    = 30000;
 var _wdrawAutoRefreshTimer = null;
+var _wdrawPendingDeletes   = {};  // id → timestamp; guards against ghost-record on auto-refresh
 
 function _wdrawStartAutoRefresh() {
   if (_wdrawAutoRefreshTimer) return;
@@ -6949,6 +6981,9 @@ function _wdrawAutoRefreshTick() {
     function(rows) {
       var parsed = parseWithdrawalRows(rows);
       if (parsed && parsed.length > 0) {
+        // Strip any row the user just deleted — prevents ghost-record reappearance
+        // while the delete_withdrawal request is still in-flight to the backend.
+        parsed = _filterPendingDeletes(parsed);
         var localW = (STATE.withdrawals || []).filter(function(r){ return r.source === 'local'; });
         STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); } catch(e){}
