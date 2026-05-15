@@ -8003,7 +8003,24 @@ function _splitFindChildFor(parent){
   var children = (STATE.items||[]).filter(_splitIs24x50);
   if (!children.length) return null;
   if (children.length === 1) return children[0];
-  // Prefer a child whose normalized description matches the parent's
+  // Strategy 1: item-code pattern match — swap "48" for "24" in the parent
+  // code (TM-RED-48 → TM-RED-24, 610-WHT-B3-48 → 610-WHT-B3-24, etc.).
+  // Try the whole-token swap first, then a looser swap of any "48" substring.
+  var pCode = String(parent && parent.code || '').trim();
+  if (pCode) {
+    var candidates = [
+      pCode.replace(/(^|[-_ ])48($|[-_ ])/, '$124$2'),  // -48-, _48_, etc.
+      pCode.replace(/48/, '24')                         // any "48" → "24"
+    ];
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var guess = candidates[ci];
+      if (guess && guess !== pCode) {
+        var byCode = children.find(function(c){ return c.code === guess; });
+        if (byCode) return byCode;
+      }
+    }
+  }
+  // Strategy 2: description normalization match
   var pn = _splitNormalizeDesc(parent && parent.desc);
   if (pn) {
     var byDesc = children.find(function(c){ return _splitNormalizeDesc(c.desc) === pn; });
@@ -8014,9 +8031,7 @@ function _splitFindChildFor(parent){
     });
     if (byPartial) return byPartial;
   }
-  // No description match found — do NOT guess. Return null so the UI
-  // blocks the split and tells the user to add the matching 24"×50yd
-  // child SKU to ITEMCODE instead of silently picking the wrong one.
+  // No match — caller will offer a manual picker dropdown.
   return null;
 }
 
