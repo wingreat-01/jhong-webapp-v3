@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_76.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_81.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -664,7 +664,7 @@ header{display:none!important}
 <div class="sync-indicator show" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
   <span class="sync-txt" id="syncIndicatorText">Syncing...</span>
-  <span class="sync-progress" id="syncIndicatorProgress">8/10</span>
+  <span class="sync-progress" id="syncIndicatorProgress">9/11</span>
 </div>
 
 <div class="toast" id="toast">Sync complete — 5.6s — 281 items, 242 withdrawals, 25 received, 194 beginning, 0 orders</div>
@@ -2405,6 +2405,33 @@ function syncNow(opts) {
     );
   }));
 
+  // ── SPLIT-PARENT → merge into STATE.withdrawals so sumWithdrawnFor deducts splits ──
+  // SPLIT-PARENT rows record every parent roll consumed during a split.
+  // Without this, availableFor() ignores splits and stock never decreases.
+  total++;
+  jobs.push(new Promise(function(resolve){
+    if (!STATE.config.proxyUrl) { bumpProg(); resolve(); return; }
+    fetchFromAppsScript('read_split_parent',
+      function(rows){
+        var parsed = parseSplitParentRows(rows || []);
+        if (parsed.length) {
+          // Remove any previously merged split-parent rows, then re-add fresh ones.
+          // They are tagged source:'split-parent' so we can identify and replace them.
+          STATE.withdrawals = (STATE.withdrawals || []).filter(function(w){
+            return w.source !== 'split-parent';
+          });
+          parsed.forEach(function(sp){ STATE.withdrawals.push(sp); });
+          console.log('[split-parent] merged '+parsed.length+' rows into STATE.withdrawals');
+        }
+        bumpProg(); resolve();
+      },
+      function(err){
+        console.warn('read_split_parent:', err);
+        bumpProg(); resolve();
+      }
+    );
+  }));
+
   Promise.all(jobs).then(function(){
     _syncInFlight = false;
     if (btn) { btn.textContent = 'Sync Now'; btn.classList.remove('loading'); }
@@ -2661,6 +2688,66 @@ function parseWithdrawalRows(rows) {
     if (isNaN(db)) return -1;
     return db - da;                          // then newest date first
   });
+  return out;
+}
+
+// ---------- SPLIT-PARENT rows → withdrawal-shaped objects ----------
+// SPLIT-PARENT header: Date(0), SplitID(1), ItemCode(2), Description(3),
+//   Width(4), W-UM(5), Length(6), L-UM(7), Qty(8), WithdrawalNo(9),
+//   Customer(10), Note(11), ID(12), Deleted(13), DeletedAt(14), DeletedBy(15)
+// These are merged into STATE.withdrawals so sumWithdrawnFor() counts them
+// and availableFor() correctly deducts split-consumed parent rolls from stock.
+function parseSplitParentRows(rows) {
+  if (!rows || rows.length < 2) return [];
+  var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
+  function col1(names) {
+    for (var i = 0; i < names.length; i++) {
+      var idx = header.indexOf(names[i]);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+  var iDate  = col1(['date']);                              if (iDate  < 0) iDate  = 0;
+  var iCode  = col1(['itemcode','item code','code']);       if (iCode  < 0) iCode  = 2;
+  var iDesc  = col1(['description','desc']);                if (iDesc  < 0) iDesc  = 3;
+  var iWidth = col1(['width']);                             if (iWidth < 0) iWidth = 4;
+  var iWUnit = col1(['w-um','wum']);                        if (iWUnit < 0) iWUnit = 5;
+  var iLen   = col1(['length']);                            if (iLen   < 0) iLen   = 6;
+  var iLUnit = col1(['l-um','lum']);                        if (iLUnit < 0) iLUnit = 7;
+  var iQty   = col1(['qty','quantity']);                    if (iQty   < 0) iQty   = 8;
+  var iWhdl  = col1(['withdrawalno','withdrawal no','splitid']); if (iWhdl < 0) iWhdl = 9;
+  var iCust  = col1(['customer']);                          if (iCust  < 0) iCust  = 10;
+  var iNote  = col1(['note','notes','remarks']);             if (iNote  < 0) iNote  = 11;
+  var iId    = col1(['id']);                                if (iId    < 0) iId    = 12;
+  var iDel   = col1(['deleted']);                           if (iDel   < 0) iDel   = 13;
+  var out = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (_isDeletedFlag(r[iDel])) continue;
+    var code = String(r[iCode]||'').trim();
+    if (!code) continue;
+    var rawId = String(r[iId]||'').trim() || ('spp_r'+(i+1)+'_'+code.replace(/[^A-Za-z0-9]/g,'').slice(0,8));
+    var _wRaw  = String(r[iWidth]||'').trim();
+    var _wuRaw = String(r[iWUnit]||'').trim();
+    var _lRaw  = String(r[iLen]  ||'').trim();
+    var _luRaw = String(r[iLUnit]||'').trim();
+    out.push({
+      id:           rawId,
+      date:         formatRawDate(String(r[iDate]||'')),
+      itemCode:     code,
+      desc:         String(r[iDesc]||'').trim(),
+      width:        _wRaw,
+      widthUnit:    _wuRaw,
+      length:       _lRaw,
+      lengthUnit:   _luRaw,
+      size:         _wRaw && _lRaw ? _wRaw+(_wuRaw?' '+_wuRaw:'')+' × '+_lRaw+(_luRaw?' '+_luRaw:'') : (_wRaw||''),
+      qty:          parseFloat(r[iQty])||0,
+      withdrawalNo: String(r[iWhdl]||'').trim(),
+      customer:     String(r[iCust]||'').trim(),
+      remarks:      String(r[iNote]||'').trim(),
+      source:       'split-parent'   // tagged so sync can replace stale entries
+    });
+  }
   return out;
 }
 
@@ -7916,8 +8003,10 @@ function _splitFindChildFor(parent){
     });
     if (byPartial) return byPartial;
   }
-  // Last resort — first matching child SKU
-  return children[0];
+  // No description match found — do NOT guess. Return null so the UI
+  // blocks the split and tells the user to add the matching 24"×50yd
+  // child SKU to ITEMCODE instead of silently picking the wrong one.
+  return null;
 }
 
 // ---- Parent typeahead (mirrors Withdraw tab's autocomplete) ----
@@ -8056,10 +8145,19 @@ function _splitOnParentSelected(code){
 
   var child = _splitFindChildFor(item);
   if (!child) {
-    card.textContent = '';
+    card.className = 'split-child-card warn';
+    card.innerHTML = '<span class="scc-code">\u26a0 No matching 24\u201d \xd7 50yd child SKU found</span>'
+      + '<span class="scc-meta">Add a 24\u201d\xd750yd item whose description matches &ldquo;'
+      + escapeHtml(item.desc || item.code)
+      + '&rdquo; in ITEMCODE, then \u21bb Sync.</span>';
     hidden.value = '';
   } else {
-    card.textContent = ''; // hidden card — child selection is silent
+    var cAvail = (typeof availableFor === 'function') ? availableFor(child) : 0;
+    card.className = 'split-child-card';
+    card.innerHTML = '\u2192 Child SKU: <span class="scc-code">' + escapeHtml(child.code) + '</span>'
+      + '<span class="scc-meta">' + escapeHtml(child.desc || '')
+      + (child.size ? '  \xb7  ' + escapeHtml(child.size) : '')
+      + '  \xb7  current stock: ' + cAvail + '</span>';
     hidden.value = child.code;
   }
   _splitRollUpdatePreview();
