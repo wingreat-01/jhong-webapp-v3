@@ -61,8 +61,16 @@ var DISPOSAL_TAB    = 'DISPOSAL';
 var DISPOSAL_HEADER = ['Date','ItemCode','Width','WidthUnit','Length','LengthUnit','Qty','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var BEGINNING_HEADER  = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','Notes','Deleted','DeletedAt','DeletedBy'];
 var SALESORDER_HEADER = ['ID','Date','Time','OrderNo','Customer','Remarks','Items','Status','Deleted','DeletedAt','DeletedBy'];
-var SPLIT_HEADER      = ['Date','SplitID','ParentCode','ParentDesc','ParentSize','ParentQty','ChildCode','ChildDesc','ChildSize','ChildQty','Note'];
+var SPLIT_HEADER      = ['Date','SplitID','ParentCode','ParentDesc','ParentSize','ParentQty','ChildCode','ChildDesc','ChildSize','ChildQty','WithdrawalID','ReceivedID','WithdrawalNo','Note'];
 var SERVED_HEADER     = ['Date','JobOrder','ItemID','Width','Length','Qty','Unit','Customer','Urgency','Status','Sales','ServedAt','RowKey','ID','Deleted','DeletedAt','DeletedBy'];
+
+// SPLIT-PARENT: records each parent roll consumed during a split (deducts from parent stock)
+var SPLIT_PARENT_TAB    = 'SPLIT-PARENT';
+var SPLIT_PARENT_HEADER = ['Date','SplitID','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','WithdrawalNo','Customer','Note','ID','Deleted','DeletedAt','DeletedBy'];
+
+// SPLIT-CHILD: records each batch of child rolls created during a split (adds to child stock)
+var SPLIT_CHILD_TAB    = 'SPLIT-CHILD';
+var SPLIT_CHILD_HEADER = ['Date','SplitID','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','MRRNo','Supplier','Note','ID','Deleted','DeletedAt','DeletedBy'];
 
 // Column indexes (1-based) for the soft-delete columns. Computed from header above.
 function _delColIdx(header) { return header.indexOf('Deleted') + 1; }
@@ -116,6 +124,8 @@ function doGet(e) {
   if (action === 'read_served')        return _json({ok:true, rows: _getServedSheet().getDataRange().getValues()});
   if (action === 'read_partialrolls')    return _json({ok:true, rows: _getPartialRollsSheet().getDataRange().getValues()});
   if (action === 'read_yardswithdrawn') return _json({ok:true, rows: _getYardsWithdrawnSheet().getDataRange().getValues()});
+  if (action === 'read_split_parent')  return _json({ok:true, rows: _getSplitParentSheet().getDataRange().getValues()});
+  if (action === 'read_split_child')   return _json({ok:true, rows: _getSplitChildSheet().getDataRange().getValues()});
 
   if (e.parameter.payload) {
     var body;
@@ -227,9 +237,7 @@ function _handleWrite(body) {
     //   1. id-based (preferred): finds the row by scanning column 12 for the ID.
     //   2. full-row scan (corruption recovery): if the col-12 scan misses, every
     //      cell in every data row is checked. This catches pre-fix split records
-    //      where broken field mapping wrote the ID into the wrong column (e.g. the
-    //      ID landed in the WIDTH cell instead of the ID cell). Without this, those
-    //      ghost rows are undeletable from the UI even with ADMIN access.
+    //      where broken field mapping wrote the ID into the wrong column.
     //   3. sheetRow-based (legacy fallback): used when the row has no ID at all
     //      (pre-dates the ID column). The frontend sends the 1-based row number.
     var sh = _getWithdrawalSheet();
@@ -247,7 +255,7 @@ function _handleWrite(body) {
           outer: for (var ri = 0; ri < allData.length; ri++) {
             for (var ci = 0; ci < allData[ri].length; ci++) {
               if (String(allData[ri][ci]).trim() === did) {
-                rowIdx = ri + 2; // convert 0-based data index → 1-based sheet row
+                rowIdx = ri + 2;
                 break outer;
               }
             }
@@ -527,20 +535,112 @@ function _handleWrite(body) {
     return _json({ok:true, code: ab.code, qty: abQty, row: absh.getLastRow()});
   }
 
-  // ===== SPLIT (audit log) =====
+  // ===== SPLIT (atomic — writes all 5 records in one call) =====
+  // Flow:
+  //   1. SPLIT-PARENT → dedicated deduction log (new tab)
+  //   2. SPLIT-CHILD  → dedicated credit log     (new tab)
+  //   3. WITHDRAWAL   → stock formula deduction  (parent available goes DOWN)
+  //   4. RECEIVED     → stock formula credit     (child available goes UP)
+  //   5. SPLIT        → audit log linking all records
+  //
+  // Stock formula (frontend + STOCKS_MONITOR):
+  //   available = origQty + beginning + received − withdrawn
   if (action === 'save_split') {
     var sp = body.record || {};
-    if (!sp.parentCode || !sp.childCode) return _json({ok:false, error:'Missing parentCode/childCode'});
+    if (!sp.parentCode) return _json({ok:false, error:'Missing parentCode'});
+    if (!sp.childCode)  return _json({ok:false, error:'Missing childCode'});
+
+    var tz     = Session.getScriptTimeZone() || 'Asia/Manila';
+    var spDate = sp.date || Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var splitId   = String(sp.splitId   || _genId('SPLIT'));
+    var whdlNo    = String(sp.withdrawalNo || splitId);
+    var customer  = String(sp.customer  || 'Internal \u2014 Roll Split');
+    var note      = _safeText(sp.note   || '');
+    var pCode     = String(sp.parentCode);
+    var pDesc     = String(sp.parentDesc  || '');
+    var cCode     = String(sp.childCode);
+    var cDesc     = String(sp.childDesc   || '');
+    var pQty      = Number(sp.parentQty)  || 1;
+    var cQty      = Number(sp.childQty)   || (pQty * 2);
+
+    // Parse parent dimensions — prefer explicit fields, fall back to parentSize string
+    var _pW  = String(sp.parentWidth      || '').trim();
+    var _pWU = String(sp.parentWidthUnit  || '').trim();
+    var _pL  = String(sp.parentLength     || '').trim();
+    var _pLU = String(sp.parentLengthUnit || '').trim();
+    if (!_pW && !_pL && sp.parentSize) {
+      var _psm = String(sp.parentSize).match(/^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX\u00d7]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/);
+      if (_psm) { _pW = _psm[1]||''; _pWU = _psm[2]||''; _pL = _psm[3]||''; _pLU = _psm[4]||''; }
+      else { _pW = String(sp.parentSize); }
+    }
+
+    // Parse child dimensions — prefer explicit fields, fall back to childSize string
+    var _cW  = String(sp.childWidth      || '').trim();
+    var _cWU = String(sp.childWidthUnit  || '').trim();
+    var _cL  = String(sp.childLength     || '').trim();
+    var _cLU = String(sp.childLengthUnit || '').trim();
+    if (!_cW && !_cL && sp.childSize) {
+      var _csm = String(sp.childSize).match(/^([0-9\/\-\.]+)\s*([a-zA-Z"']*)\s*[xX\u00d7]\s*([0-9\/\-\.]+)\s*([a-zA-Z"']*)$/);
+      if (_csm) { _cW = _csm[1]||''; _cWU = _csm[2]||''; _cL = _csm[3]||''; _cLU = _csm[4]||''; }
+      else { _cW = String(sp.childSize); }
+    }
+
+    // Size display strings
+    var pSizeStr = (_pW && _pL) ? (_pW + (_pWU?' '+_pWU:'') + ' \u00d7 ' + _pL + (_pLU?' '+_pLU:'')) : (sp.parentSize || '');
+    var cSizeStr = (_cW && _cL) ? (_cW + (_cWU?' '+_cWU:'') + ' \u00d7 ' + _cL + (_cLU?' '+_cLU:'')) : (sp.childSize  || '');
+
+    // Stable IDs for cross-referencing
+    var parentRecId = String(sp.withdrawalId || '').trim() || _genId('whd');
+    var childRecId  = String(sp.receivedId   || '').trim() || _genId('rec');
+    var spParentId  = _genId('spp');
+    var spChildId   = _genId('spc');
+
+    var parentRemark = 'Split into ' + cQty + '\u00d7 ' + cCode + ' [' + splitId + ']' + (sp.note ? '  \u00b7  ' + sp.note : '');
+    var childRemark  = 'From ' + pCode + ' [' + splitId + '] whd:' + parentRecId + (sp.note ? '  \u00b7  ' + sp.note : '');
+
+    // ── 1. SPLIT-PARENT (dedicated deduction log) ────────────────────
+    var spParentSh = _getSplitParentSheet();
+    spParentSh.appendRow([
+      spDate, splitId, pCode, pDesc, _pW, _pWU, _pL, _pLU,
+      pQty, whdlNo, customer, note, spParentId, false, '', ''
+    ]);
+
+    // ── 2. SPLIT-CHILD (dedicated credit log) ───────────────────────
+    var spChildSh = _getSplitChildSheet();
+    spChildSh.appendRow([
+      spDate, splitId, cCode, cDesc, _cW, _cWU, _cL, _cLU,
+      cQty, splitId, 'Internal \u2014 Roll Split', note, spChildId, false, '', ''
+    ]);
+
+    // ── 3. WITHDRAWAL (stock formula deduction — parent available ↓) ─
+    var whdSh = _getWithdrawalSheet();
+    if (_findRowById(whdSh, 12, parentRecId) === -1) {
+      whdSh.appendRow([
+        spDate, pCode, pDesc, _pW, _pWU, _pL, _pLU,
+        pQty, whdlNo, customer, _safeText(parentRemark),
+        parentRecId, false, '', ''
+      ]);
+    }
+
+    // ── 4. RECEIVED (stock formula credit — child available ↑) ───────
+    var recSh = _getReceivedSheet();
+    if (_findRowById(recSh, 9, childRecId) === -1) {
+      recSh.appendRow([
+        spDate, cCode, cDesc, cSizeStr,
+        cQty, splitId, 'Internal \u2014 Roll Split', _safeText(childRemark),
+        childRecId, false, '', ''
+      ]);
+    }
+
+    // ── 5. SPLIT (audit log linking all records) ─────────────────────
     var spsh = _getSplitSheet();
-    var spDate = sp.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Manila', 'yyyy-MM-dd');
-    var spRow = [
-      spDate, String(sp.splitId || ''), String(sp.parentCode),
-      sp.parentDesc || '', sp.parentSize || '', Number(sp.parentQty)||0,
-      String(sp.childCode), sp.childDesc || '', sp.childSize || '',
-      Number(sp.childQty)||0, _safeText(sp.note || '')
-    ];
-    spsh.appendRow(spRow);
-    return _json({ok:true, splitId: sp.splitId, row: spsh.getLastRow()});
+    spsh.appendRow([
+      spDate, splitId, pCode, pDesc, pSizeStr, pQty,
+      cCode, cDesc, cSizeStr, cQty,
+      parentRecId, childRecId, whdlNo, note
+    ]);
+
+    return _json({ok:true, splitId:splitId, withdrawalId:parentRecId, receivedId:childRecId, splitParentId:spParentId, splitChildId:spChildId});
   }
 
   // ===== SERVED =====
@@ -749,6 +849,20 @@ function _getSplitSheet() {
   var sh = ss.getSheetByName(SPLIT_TAB);
   if (!sh) { sh = ss.insertSheet(SPLIT_TAB); sh.appendRow(SPLIT_HEADER); return sh; }
   if (sh.getLastRow() === 0) sh.appendRow(SPLIT_HEADER);
+  return sh;
+}
+function _getSplitParentSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(SPLIT_PARENT_TAB);
+  if (!sh) { sh = ss.insertSheet(SPLIT_PARENT_TAB); sh.appendRow(SPLIT_PARENT_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(SPLIT_PARENT_HEADER);
+  return sh;
+}
+function _getSplitChildSheet() {
+  var ss = _openSS();
+  var sh = ss.getSheetByName(SPLIT_CHILD_TAB);
+  if (!sh) { sh = ss.insertSheet(SPLIT_CHILD_TAB); sh.appendRow(SPLIT_CHILD_HEADER); return sh; }
+  if (sh.getLastRow() === 0) sh.appendRow(SPLIT_CHILD_HEADER);
   return sh;
 }
 function _getServedSheet() {
