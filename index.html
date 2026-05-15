@@ -1753,15 +1753,16 @@ header{display:none!important}
       </div>
     </div>
 
-    <!-- Row 2: Date + Customer -->
+    <!-- Row 2: Date + Withdrawal No. (with autocomplete that auto-fills Customer) -->
     <div class="split-simple-bar" style="margin-top:8px">
       <div style="flex:0 0 160px;display:flex;flex-direction:column;gap:3px">
         <label for="splitDateVisible" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">DATE</label>
         <input type="date" id="splitDateVisible" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box" oninput="document.getElementById(&#39;splitDate&#39;).value=this.value">
       </div>
-      <div style="flex:1 1 200px;min-width:160px;display:flex;flex-direction:column;gap:3px">
-        <label for="splitCustomer" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">CUSTOMER</label>
-        <input type="text" id="splitCustomer" placeholder="Internal — Roll Split" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box">
+      <div style="flex:1 1 200px;min-width:160px;position:relative;display:flex;flex-direction:column;gap:3px">
+        <label for="splitWhdlNo" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">WITHDRAWAL NO. <span style="font-weight:400;color:#90A4AE">(optional)</span></label>
+        <input type="text" id="splitWhdlNo" placeholder="e.g. CO-26-0384" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box" oninput="onSplitWhdlNoInput()" onkeydown="onSplitWhdlNoKey(event)" onblur="setTimeout(hideSplitWhdlNoAC,180)">
+        <div class="ac-list" id="splitWhdlNoAcList" style="z-index:10020"></div>
       </div>
     </div>
 
@@ -1785,12 +1786,11 @@ header{display:none!important}
       </div>
     </div>
 
-    <!-- Row 4: Withdrawal No. + Remarks side by side -->
+    <!-- Row 4: Customer + Remarks side by side -->
     <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
-      <div style="flex:0 0 220px;min-width:180px;position:relative;display:flex;flex-direction:column;gap:3px">
-        <label for="splitWhdlNo" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">WITHDRAWAL NO. <span style="font-weight:400;color:#90A4AE">(optional)</span></label>
-        <input type="text" id="splitWhdlNo" placeholder="e.g. CO-26-0384" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box" oninput="onSplitWhdlNoInput()" onkeydown="onSplitWhdlNoKey(event)" onblur="setTimeout(hideSplitWhdlNoAC,180)">
-        <div class="ac-list" id="splitWhdlNoAcList" style="z-index:10020"></div>
+      <div style="flex:0 0 220px;min-width:180px;display:flex;flex-direction:column;gap:3px">
+        <label for="splitCustomer" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">CUSTOMER</label>
+        <input type="text" id="splitCustomer" placeholder="Internal — Roll Split" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;font-family:inherit;box-sizing:border-box">
       </div>
       <div style="flex:1 1 200px;min-width:160px;display:flex;flex-direction:column;gap:3px">
         <label for="splitRemarks" style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:0.5px">REMARKS <span style="font-weight:400;color:#90A4AE">(optional)</span></label>
@@ -3590,16 +3590,29 @@ function _splitWhdlRender(v, list) {
           ? '<span class="ac-desc">👤 ' + escapeHtml(m.customer.trim()) + '</span>'
           : (m.sub && m.sub.trim() ? '<span class="ac-desc">' + escapeHtml(m.sub.trim()) + '</span>' : ''));
     row.addEventListener('mousedown', function(e) { e.preventDefault(); });
-    row.addEventListener('click', function() { pickSplitWhdlNo(this.getAttribute('data-no')); });
+    row.addEventListener('click', function() { pickSplitWhdlNo(this.getAttribute('data-no'), this.getAttribute('data-customer')); });
     el.appendChild(row);
   });
   el.classList.add('show');
 }
 
-function pickSplitWhdlNo(no) {
+function pickSplitWhdlNo(no, customer) {
   var el = document.getElementById('splitWhdlNo');
   if (el) { el.value = no; }
   hideSplitWhdlNoAC();
+  // Auto-fill Customer when the matched withdrawal carries one. Only overwrite
+  // an empty field OR the default 'Internal — Roll Split' placeholder so the
+  // user's hand-typed customer is preserved.
+  var custEl = document.getElementById('splitCustomer');
+  if (custEl && customer && customer.trim()) {
+    var cur = (custEl.value || '').trim();
+    if (!cur || cur === 'Internal — Roll Split') {
+      custEl.value = customer.trim();
+      custEl.style.transition = 'background 0.3s';
+      custEl.style.background = '#E8F5E9';
+      setTimeout(function() { custEl.style.background = ''; }, 800);
+    }
+  }
   // Move focus to the Split button
   var btn = document.getElementById('splitConfirmBtn');
   if (btn && !btn.disabled) btn.focus();
