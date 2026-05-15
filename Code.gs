@@ -1104,7 +1104,6 @@ function _writeStockMonitorContent(ss, sh) {
     var wUnit    = r[3] !== undefined ? String(r[3]).trim() : '';
     var length   = r[4] !== undefined ? String(r[4]).trim() : '';
     var lUnit    = r[5] !== undefined ? String(r[5]).trim() : '';
-    var size     = (width && length) ? (width + ' x ' + length) : 'n/a';
     var origQty  = parseFloat(r[origQtyIdx] || 0) || 0;
     var beg      = begMap[code]  || 0;
     var rec      = recMap[code]  || 0;
@@ -1116,7 +1115,7 @@ function _writeStockMonitorContent(ss, sh) {
     else if (avail <= 3) status = 'Low Stock';
     else                 status = 'In Stock';
 
-    itemRows.push([code, desc, size, origQty, beg, rec, whd, avail, status]);
+    itemRows.push([code, desc, width, wUnit, length, lUnit, origQty, beg, rec, whd, avail, status]);
   });
 
   // ── 5. Yards stock summary ───────────────────────────────────────
@@ -1196,42 +1195,41 @@ function _writeStockMonitorContent(ss, sh) {
   }
 
   // ── Title block ──
-  row(['JHONG WITHDRAWAL SYSTEM — STOCK MONITOR', '', '', '', '', '', '', '', ''],
+  row(['JHONG WITHDRAWAL SYSTEM — STOCK MONITOR', '', '', '', '', '', '', '', '', '', '', ''],
       '#1B5E20', '#FFFFFF', 'bold', 'left');
-  row(['Last refreshed: ' + now, '', '', '', '', '', '', '', ''],
+  row(['Last refreshed: ' + now, '', '', '', '', '', '', '', '', '', '', ''],
       '#E8F5E9', '#2E7D32', 'normal', 'left');
   row([], '#FFFFFF');  // blank spacer
 
   // ── Section 1: MAIN STOCK ON HAND ──
   row(['■  MAIN STOCK — ON HAND  (formula: origQty + beginning + received − withdrawn)',
-       '', '', '', '', '', '', '', ''],
+       '', '', '', '', '', '', '', '', '', '', ''],
       '#2E7D32', '#FFFFFF', 'bold', 'left');
-  row(['Item Code', 'Description', 'Size', 'Orig Qty', 'Beginning', 'Received',
-       'Withdrawn', 'Available', 'Status'],
+  row(['Item Code', 'Description', 'Width', 'W-UM', 'Length', 'L-UM',
+       'Orig Qty', 'Beginning', 'Received', 'Withdrawn', 'Available', 'Status'],
       '#A5D6A7', '#1B5E20', 'bold', 'center');
 
   var mainStartRow = allRows.length + 1; // 1-based, will be used for totals formula
   var totalAvail = 0;
   itemRows.forEach(function(r) {
-    var avail   = r[7];
-    var status  = r[8];
+    var avail   = r[10];  // Available is index 10 in the new 12-col layout
+    var status  = r[11];  // Status is index 11
     var rowBg   = (allRows.length % 2 === 0) ? '#F9FBE7' : '#FFFFFF';
     var statFc  = status === 'In Stock'    ? '#2E7D32'
                 : status === 'Low Stock'   ? '#E65100'
                 :                           '#C62828';
-    // Columns: Code, Desc, Size, OrigQty, Beg, Rec, Whd, Avail, Status
+    // Columns: Code, Desc, Width, W-UM, Length, L-UM, OrigQty, Beg, Rec, Whd, Avail, Status
     allRows.push(r);
     formats.push(rowBg);
     fontColors.push('#000000');
     fontWeights.push('normal');
     hAligns.push('left');
-    // Override avail colour (col H = index 7) and status (col I = index 8) below
     totalAvail += avail;
   });
   var mainEndRow = allRows.length;
 
-  // Totals row for main section
-  row(['', 'TOTAL ITEMS: ' + itemRows.length, '', '', '', '', '', totalAvail, ''],
+  // Totals row for main section (12 cols; totalAvail at index 10 = col K)
+  row(['', 'TOTAL ITEMS: ' + itemRows.length, '', '', '', '', '', '', '', '', totalAvail, ''],
       '#C8E6C9', '#1B5E20', 'bold', 'right');
   row([], '#FFFFFF');  // blank spacer
 
@@ -1291,7 +1289,7 @@ function _writeStockMonitorContent(ss, sh) {
   sh.clearFormats();
 
   // Determine column count from widest row
-  var maxCols = 9; // main section has 9 cols
+  var maxCols = 12; // main section has 12 cols (added Width/W-UM/Length/L-UM)
   var totalRows = allRows.length;
   if (totalRows === 0) return;
 
@@ -1316,30 +1314,34 @@ function _writeStockMonitorContent(ss, sh) {
       if (hAligns[ri] === 'center') {
         rowRange.setHorizontalAlignment('center');
       } else {
-        sh.getRange(ri + 1, 4, 1, 6).setHorizontalAlignment('right');
+        // Right-align cols 3-12 (covers numerics in both main and yards/partial totals)
+        sh.getRange(ri + 1, 3, 1, maxCols - 2).setHorizontalAlignment('right');
       }
     }
   }
 
-  // ── Status column colour override for main stock rows (col I = 9) ──
-  // Find them by scanning the Status column values
+  // ── Status column colour override for main stock rows (col L = 12) ──
+  // Find them by scanning the Status column values (index 11 in 12-col layout)
   for (var ri2 = 0; ri2 < padded.length; ri2++) {
-    var statusVal = padded[ri2][8];
-    if (statusVal === 'In Stock')    sh.getRange(ri2+1, 9).setFontColor('#2E7D32').setFontWeight('bold');
-    else if (statusVal === 'Low Stock')   sh.getRange(ri2+1, 9).setFontColor('#E65100').setFontWeight('bold');
-    else if (statusVal === 'Out of Stock') sh.getRange(ri2+1, 9).setFontColor('#C62828').setFontWeight('bold');
+    var statusVal = padded[ri2][11];
+    if (statusVal === 'In Stock')    sh.getRange(ri2+1, 12).setFontColor('#2E7D32').setFontWeight('bold');
+    else if (statusVal === 'Low Stock')   sh.getRange(ri2+1, 12).setFontColor('#E65100').setFontWeight('bold');
+    else if (statusVal === 'Out of Stock') sh.getRange(ri2+1, 12).setFontColor('#C62828').setFontWeight('bold');
   }
 
   // ── Format column widths ──
-  sh.setColumnWidth(1, 200);  // Item Code
-  sh.setColumnWidth(2, 280);  // Description
-  sh.setColumnWidth(3, 110);  // Size
-  sh.setColumnWidth(4, 90);   // Orig Qty
-  sh.setColumnWidth(5, 90);   // Beginning
-  sh.setColumnWidth(6, 90);   // Received
-  sh.setColumnWidth(7, 90);   // Withdrawn
-  sh.setColumnWidth(8, 95);   // Available
-  sh.setColumnWidth(9, 120);  // Status
+  sh.setColumnWidth(1, 200);   // Item Code
+  sh.setColumnWidth(2, 260);   // Description
+  sh.setColumnWidth(3, 65);    // Width
+  sh.setColumnWidth(4, 55);    // W-UM
+  sh.setColumnWidth(5, 65);    // Length
+  sh.setColumnWidth(6, 55);    // L-UM
+  sh.setColumnWidth(7, 80);    // Orig Qty
+  sh.setColumnWidth(8, 85);    // Beginning
+  sh.setColumnWidth(9, 85);    // Received
+  sh.setColumnWidth(10, 85);   // Withdrawn
+  sh.setColumnWidth(11, 90);   // Available
+  sh.setColumnWidth(12, 115);  // Status
 
   // ── Reset frozen state + clear any existing merges from a previous run ──
   // We avoid merging row 1-2 because (a) merging across cols 1-9 conflicts with
