@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_61.html -->
+<!-- saved from url=(0055)file:///C:/Users/CHAD-INVENTORY/Downloads/index_62.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -780,7 +780,7 @@ header{display:none!important}
             <th>Item Code</th>
             <th>Description</th>
             <th>Size</th>
-            <th>Original Qty</th>
+            <th>Beginning</th>
             <th>Received</th>
             <th>Withdrawn</th>
             <th>Available</th>
@@ -2810,11 +2810,12 @@ function renderStocks() {
     else if (avail < 5) { status = 'Low Stock'; pillCls = 'pill-amber'; }
     else { status = 'In Stock'; pillCls = 'pill-green'; }
 
+    var beg = sumBeginningFor(it.code);
     html += '<tr>'
          + '<td class="td-code">'+escapeHtml(it.code)+'</td>'
          + '<td>'+escapeHtml(it.desc||'—')+'</td>'
          + '<td><span class="pill pill-gray">'+escapeHtml(it.size||'—')+'</span></td>'
-         + '<td>'+(it.origQty||0)+'</td>'
+         + '<td>'+(beg)+'</td>'
          + '<td style="color:#2E7D32;font-weight:600">'+r+'</td>'
          + '<td style="color:#C62828;font-weight:600">'+w+'</td>'
          + '<td style="font-weight:700;font-size:15px;color:'+(avail<=0?'#C62828':(avail<5?'#E65100':'#2E7D32'))+'">'+avail+'</td>'
@@ -2870,17 +2871,18 @@ function exportStocksToExcel() {
     if (/[",\n\r]/.test(s) || /^\s|\s$/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
     return s;
   }
-  var headers = ['Item Code','Description','Size','Original Qty','Received','Withdrawn','Available','Status'];
+  var headers = ['Item Code','Description','Size','Beginning','Received','Withdrawn','Available','Status'];
   var lines = [headers.map(csvCell).join(',')];
   rows.forEach(function(it){
     var w = sumWithdrawnFor(it.code);
     var r = sumReceivedFor(it.code);
+    var b = sumBeginningFor(it.code);
     var a = availableFor(it);
     lines.push([
       it.code,
       it.desc || '',
       it.size || '',
-      it.origQty || 0,
+      b,
       r,
       w,
       a,
@@ -6304,14 +6306,15 @@ function performSearch() {
   if (stocksRes.length) {
     out += '<div style="margin-top:10px"><div class="section-title" style="font-size:14px;color:#2E7D32;margin-bottom:6px">📦 Stocks ('+stocksRes.length+')</div>';
     out += '<div class="card"><div class="table-wrap"><table>';
-    out += '<thead><tr><th>Item Code</th><th>Description</th><th>Size</th><th>Original</th><th>Received</th><th>Withdrawn</th><th>Available</th></tr></thead><tbody>';
+    out += '<thead><tr><th>Item Code</th><th>Description</th><th>Size</th><th>Beginning</th><th>Received</th><th>Withdrawn</th><th>Available</th></tr></thead><tbody>';
     stocksRes.slice(0, 200).forEach(function(it){
       var w = sumWithdrawnFor(it.code);
       var r = sumReceivedFor(it.code);
+      var b = sumBeginningFor(it.code);
       var avail = availableFor(it);
       out += '<tr><td class="td-code">'+escapeHtml(it.code)+'</td><td>'+escapeHtml(it.desc||'—')+'</td>'
           +  '<td><span class="pill pill-gray">'+escapeHtml(it.size||'—')+'</span></td>'
-          +  '<td>'+(it.origQty||0)+'</td><td style="color:#2E7D32;font-weight:600">'+r+'</td>'
+          +  '<td>'+(b)+'</td><td style="color:#2E7D32;font-weight:600">'+r+'</td>'
           +  '<td style="color:#C62828;font-weight:600">'+w+'</td>'
           +  '<td style="font-weight:700;color:'+(avail<=0?'#C62828':(avail<5?'#E65100':'#2E7D32'))+'">'+avail+'</td></tr>';
     });
