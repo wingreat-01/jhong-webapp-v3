@@ -879,8 +879,13 @@ function _json(obj){
 //   Available = origQty (ITEMCODE col G) + beginning + received − withdrawn
 //   where:
 //     beginning = sum of non-deleted BEGINNING rows for that item code
-//     received  = sum of non-deleted RECEIVED rows for that item code
-//     withdrawn = sum of non-deleted WITHDRAWAL rows for that item code
+//     received  = sum of non-deleted RECEIVED rows
+//                 + sum of non-deleted SPLIT-CHILD rows (child rolls produced
+//                   by splits — uses new Width / W-UM / Length / L-UM format,
+//                   qty at col I, Deleted at col N)
+//     withdrawn = sum of non-deleted WITHDRAWAL rows
+//                 + sum of non-deleted SPLIT-PARENT rows (parent rolls consumed
+//                   by splits — same new column layout)
 // =====================================================================
 
 var STOCK_MONITOR_TAB = 'STOCKS_MONITOR';
@@ -1009,6 +1014,24 @@ function _writeStockMonitorContent(ss, sh) {
     ? pwSh.getRange(2, 1, pwSh.getLastRow() - 1, pwSh.getLastColumn()).getValues()
     : [];
 
+  // SPLIT-PARENT: [Date(0), SplitID(1), ItemCode(2), Description(3), Width(4),
+  //   W-UM(5), Length(6), L-UM(7), Qty(8), WithdrawalNo(9), Customer(10),
+  //   Note(11), ID(12), Deleted(13), DeletedAt(14), DeletedBy(15)]
+  // NEW separate-dimension format — replaces the old single-Size column.
+  var spSh    = _getSplitParentSheet();
+  var spData  = spSh.getLastRow() > 1
+    ? spSh.getRange(2, 1, spSh.getLastRow() - 1, spSh.getLastColumn()).getValues()
+    : [];
+
+  // SPLIT-CHILD: [Date(0), SplitID(1), ItemCode(2), Description(3), Width(4),
+  //   W-UM(5), Length(6), L-UM(7), Qty(8), MRRNo(9), Supplier(10),
+  //   Note(11), ID(12), Deleted(13), DeletedAt(14), DeletedBy(15)]
+  // NEW separate-dimension format — replaces the old single-Size column.
+  var scSh    = _getSplitChildSheet();
+  var scData  = scSh.getLastRow() > 1
+    ? scSh.getRange(2, 1, scSh.getLastRow() - 1, scSh.getLastColumn()).getValues()
+    : [];
+
   // ── 2. Build lookup maps ─────────────────────────────────────────
 
   // Beginning: sum qty per itemCode (col B=1, qty=col H=7, Deleted=col J=9)
@@ -1021,6 +1044,8 @@ function _writeStockMonitorContent(ss, sh) {
   });
 
   // Received: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col J=9)
+  // Plus SPLIT-CHILD rolls produced by splits (new W/W-UM/L/L-UM format,
+  // qty in col I=8, Deleted in col N=13).
   var recMap = {};
   recData.forEach(function(r) {
     var code    = String(r[1] || '').trim();
@@ -1028,14 +1053,28 @@ function _writeStockMonitorContent(ss, sh) {
     if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
     recMap[code] = (recMap[code] || 0) + (parseFloat(r[4]) || 0);
   });
+  scData.forEach(function(r) {
+    var code    = String(r[2] || '').trim();       // col C — ItemCode
+    var deleted = r[13];                            // col N — Deleted
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    recMap[code] = (recMap[code] || 0) + (parseFloat(r[8]) || 0);  // col I — Qty
+  });
 
   // Withdrawn: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col J=9)
+  // Plus SPLIT-PARENT rolls consumed by splits (new W/W-UM/L/L-UM format,
+  // qty in col I=8, Deleted in col N=13).
   var whdMap = {};
   whdData.forEach(function(r) {
     var code    = String(r[1] || '').trim();
     var deleted = r[9];
     if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
     whdMap[code] = (whdMap[code] || 0) + (parseFloat(r[4]) || 0);
+  });
+  spData.forEach(function(r) {
+    var code    = String(r[2] || '').trim();       // col C — ItemCode
+    var deleted = r[13];                            // col N — Deleted
+    if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
+    whdMap[code] = (whdMap[code] || 0) + (parseFloat(r[8]) || 0);  // col I — Qty
   });
 
   // ── 3. ITEMCODE column detection (mirrors frontend parser) ───────
