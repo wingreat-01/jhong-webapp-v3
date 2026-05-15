@@ -1341,13 +1341,21 @@ function _writeStockMonitorContent(ss, sh) {
   sh.setColumnWidth(8, 95);   // Available
   sh.setColumnWidth(9, 120);  // Status
 
-  // ── Freeze header rows (title + refreshed + blank + section header = 4 rows, then col header = row 5) ──
-  sh.setFrozenRows(5);
-  sh.setFrozenColumns(1);
+  // ── Reset frozen state + clear any existing merges from a previous run ──
+  // Sheets refuses to merge across the frozen/non-frozen column boundary,
+  // so frozen columns must be cleared before we re-apply the title merges.
+  sh.setFrozenRows(0);
+  sh.setFrozenColumns(0);
+  sh.getRange(1, 1, 2, maxCols).breakApart();
 
   // ── Title row: merge across all 9 cols ──
   sh.getRange(1, 1, 1, maxCols).merge().setFontSize(13);
   sh.getRange(2, 1, 1, maxCols).merge().setFontSize(10).setFontStyle('italic');
+
+  // ── Freeze header rows AFTER the merges land (title + refreshed + blank
+  //    + section header = 4 rows, then col header = row 5). ──
+  sh.setFrozenRows(5);
+  sh.setFrozenColumns(1);
 
   Logger.log('STOCKS_MONITOR written: ' + totalRows + ' rows, ' +
              itemRows.length + ' items, ' +
