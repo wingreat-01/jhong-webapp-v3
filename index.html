@@ -2339,19 +2339,23 @@ function syncNow(opts) {
         clearTimeout(_guard);
         var parsed = parseYardsStockRows(rows || []);
         var backendHasDataRows = (rows || []).length > 1;
+        console.log('[YardsStock] sync: backendRows='+(rows||[]).length+' parsed='+parsed.length);
         if (parsed.length > 0 || !backendHasDataRows) {
           var existing = STATE.threeMYards || [];
           STATE.threeMYards = parsed.map(function(r){
             var loc = existing.find(function(e){ return (e.coreNo||'').toLowerCase() === (r.coreNo||'').toLowerCase(); });
             r.withdrawn = loc ? (parseFloat(loc.withdrawn)||0) : 0;
-            r.remarks   = r.remarks || (loc ? (loc.remarks||'') : '');
+            // Only fill remarks from local state when the backend returned blank
+            if (!r.remarks && loc) r.remarks = loc.remarks || '';
             return r;
           });
         } else {
           console.warn('read_yards_stock: backend returned', (rows||[]).length-1,
-            'rows but parser yielded 0 — keeping local state. Check YARDS-STOCK sheet headers.');
+            'rows but parser yielded 0 — keeping local state.',
+            'Header row:', (rows && rows[0]) ? JSON.stringify(rows[0]) : 'n/a');
         }
         try { render3MYards(); } catch(e){}
+        try { renderYardsStock(); } catch(e){}
         _finish();
       },
       function(err){
@@ -2837,6 +2841,9 @@ function parseSplitChildRows(rows) {
 // is now in col H so it doesn't collide with Width/W-UM/Length/L-UM.
 function parseYardsStockRows(rows) {
   if (!rows || rows.length < 2) return [];
+  // YARDS_STOCK_HEADER canonical layout (0-based):
+  //   0=Date  1=ItemCode  2=Description  3=Width  4=W-UM  5=Length  6=L-UM
+  //   7=CoreNo  8=Supplier  9=Remarks  10=ID  11=Deleted  12=DeletedAt  13=DeletedBy
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
   function col1(names) {
     for (var i = 0; i < names.length; i++) {
@@ -2850,34 +2857,55 @@ function parseYardsStockRows(rows) {
   var iDesc  = col1(['description','desc','itemdesc','item description']);
   var iWidth = col1(['width']);
   var iWU    = col1(['w-um','wum','widthunit','width unit']);
-  var iLen   = col1(['length','qty','quantity','qty (yards)','yards','qtyyards']);
+  // 'length' is the yards-quantity column in YARDS_STOCK_HEADER (col F = index 5).
+  // Do NOT include 'qty' here — that alias could bind to the wrong column on
+  // legacy or migrated sheets where a "Qty" header exists at a different position.
+  var iLen   = col1(['length']);
   var iLU    = col1(['l-um','lum','lengthunit','length unit','yardsunit']);
-  var iCore  = col1(['coreno','core no','core no.','coreno.','mrrno','mrr','mrr no','mrr no.']);
+  // CoreNo lives in col H (index 7). Accept all known aliases including the
+  // exact lowercase form 'coreno' that the backend writes.
+  var iCore  = col1(['coreno','core no','core no.','coreno.','mrrno','mrr no','mrr no.','mrr']);
   var iSup   = col1(['supplier']);
   var iRem   = col1(['remarks','notes','note']);
+  // 'id' must match exactly — the backend header cell is "ID" → lowercased "id".
   var iId    = col1(['id']);
   var iDel   = col1(['deleted']);
-  // Positional fallbacks for YARDS_STOCK_HEADER canonical order:
+
+  // Hard positional fallbacks — every index is pinned to the exact column
+  // confirmed in the live YARDS-STOCK sheet screenshot (2026-05-16):
+  //   A(0)=Date  B(1)=ItemCode  C(2)=Description  D(3)=Width  E(4)=W-UM
+  //   F(5)=Length  G(6)=L-UM  H(7)=CoreNo  I(8)=Supplier  J(9)=Remarks
+  //   K(10)=ID  L(11)=Deleted  M(12)=DeletedAt  N(13)=DeletedBy
   if (iDate  < 0) iDate  = 0;
   if (iCode  < 0) iCode  = 1;
   if (iDesc  < 0) iDesc  = 2;
   if (iWidth < 0) iWidth = 3;
   if (iWU    < 0) iWU    = 4;
-  if (iLen   < 0) iLen   = 5;
-  if (iLU    < 0) iLU    = 6;
-  if (iCore  < 0) iCore  = 7;
-  if (iSup   < 0) iSup   = 8;
-  // iRem intentionally has no positional fallback — leave as -1 if absent
-  if (iId    < 0) iId    = 10;
-  if (iDel   < 0) iDel   = 11;
+  if (iLen   < 0) iLen   = 5;   // col F — yards quantity
+  if (iLU    < 0) iLU    = 6;   // col G — length unit (yds)
+  if (iCore  < 0) iCore  = 7;   // col H — CoreNo  ← was missing reliable fallback
+  if (iSup   < 0) iSup   = 8;   // col I — Supplier
+  if (iRem   < 0) iRem   = 9;   // col J — Remarks  ← was intentionally left -1 (bug)
+  if (iId    < 0) iId    = 10;  // col K — ID
+  if (iDel   < 0) iDel   = 11;  // col L — Deleted
+
+  console.log('[YardsStock] col map: iCode='+iCode+' iLen='+iLen+' iCore='+iCore
+    +' iId='+iId+' iDel='+iDel+' iRem='+iRem);
+
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
+    // Guard: skip rows that are shorter than the minimum required columns
+    if (!r || r.length < 2) continue;
     if (_isDeletedFlag(r[iDel])) continue;
     var code = String(r[iCode]||'').trim();
     if (!code) continue;
     var coreNo = String(r[iCore]||'').trim();
     if (!coreNo) coreNo = 'ROLL-'+(i);
+    // Guard: remarks column must not accidentally contain a date string
+    // (can happen when iRem was -1 and row[0] = date was used as fallback).
+    var remarkRaw = iRem >= 0 ? String(r[iRem]||'').trim() : '';
+    var remark = /^\d{4}-\d{2}-\d{2}/.test(remarkRaw) ? '' : remarkRaw;
     out.push({
       coreNo:     coreNo,
       itemId:     code,
@@ -2886,8 +2914,9 @@ function parseYardsStockRows(rows) {
       widthUnit:  String(r[iWU]||'in').trim() || 'in',
       qtyYards:   parseFloat(r[iLen]) || 0,
       lengthUnit: String(r[iLU]||'yds').trim() || 'yds',
-      withdrawn:  0,    // restored from local state in the merge step
-      remarks:    (function(){ var v = iRem >= 0 ? String(r[iRem]||'').trim() : ''; return /^\d{4}-\d{2}-\d{2}/.test(v) ? '' : v; })(),
+      supplier:   String(r[iSup]||'').trim(),
+      withdrawn:  0,    // restored from the YARDSWITHDRAWN merge step
+      remarks:    remark,
       _backendId: String(r[iId]||'').trim()
     });
   }
