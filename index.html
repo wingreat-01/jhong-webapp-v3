@@ -2659,6 +2659,11 @@ function parseWithdrawalRows(rows) {
     // Guard: withdrawalNo must not look like an internal whd_* ID or ISO date
     var whdlRaw = String(r[iWhdl]||'').trim();
     if (/^whd_/.test(whdlRaw) || /^\d{4}-\d{2}-\d{2}/.test(whdlRaw)) whdlRaw = '';
+    // Skip legacy split-parent rows written to WITHDRAWAL by old code.
+    // These rows have WithdrawalNo = "SPLIT-..." and are now tracked exclusively
+    // via the SPLIT-PARENT tab → parseSplitParentRows → STATE.withdrawals.
+    // Counting them here too would double-deduct every split from parent stock.
+    if (/^SPLIT-/i.test(whdlRaw)) continue;
     // Resolve width/length: prefer new individual columns; fall back to parsing old Size column
     var _wRaw  = iWidth >= 0 ? String(r[iWidth]  || '').trim() : '';
     var _wuRaw = iWUnit >= 0 ? String(r[iWUnit] || '').trim() : '';
@@ -2992,6 +2997,12 @@ function parseReceivedRows(rows) {
     if (iDel >= 0 && _isDeletedFlag(r[iDel])) continue;   // skip soft-deleted
     var code = String(iCode >= 0 ? r[iCode] : '').trim();
     if (!code) continue;
+    // Skip legacy split-child rows written to RECEIVED by old code.
+    // These rows have MRR No = "SPLIT-..." and are now tracked exclusively
+    // via the SPLIT-CHILD tab → parseSplitChildRows → STATE.received.
+    // Counting them here too would double the credit for every split.
+    var mrrVal = iMrr >= 0 ? String(r[iMrr]||'').trim() : '';
+    if (/^SPLIT-/i.test(mrrVal)) continue;
     var rawId = iId >= 0 ? String(r[iId]||'').trim() : '';
     var legacyNoId = !rawId;
     // BUGFIX v3.27: legacy received rows missing an ID would all share id=''

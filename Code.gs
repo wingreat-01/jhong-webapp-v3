@@ -1126,12 +1126,17 @@ function _writeStockMonitorContent(ss, sh) {
   // Withdrawn: sum qty per itemCode
   // WITHDRAWAL new layout: [Date(0),ItemCode(1),Desc(2),Width(3),W-UM(4),Length(5),L-UM(6),
   //   Qty(7),WithdrawalNo(8),Customer(9),Remarks(10),ID(11),Deleted(12),DeletedAt(13),DeletedBy(14)]
+  // Skip rows whose WithdrawalNo starts with "SPLIT-" — those are legacy split-parent rows
+  // that were written directly to WITHDRAWAL by old code; they are now tracked in SPLIT-PARENT.
   // Plus SPLIT-PARENT rolls consumed by splits (new W/W-UM/L/L-UM format,
   // qty in col I=8, Deleted in col N=13).
   var whdMap = {};
   whdData.forEach(function(r) {
     var code    = String(r[1] || '').trim();
     var deleted = r[12];                           // col M — Deleted (new layout)
+    var whdlNo  = String(r[8] || '').trim();       // col I — WithdrawalNo
+    // Skip legacy split-parent rows already tracked in SPLIT-PARENT tab
+    if (/^SPLIT-/i.test(whdlNo)) return;
     if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
     whdMap[code] = (whdMap[code] || 0) + (parseFloat(r[7]) || 0);  // col H — Qty
   });
