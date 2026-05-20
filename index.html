@@ -2659,11 +2659,6 @@ function parseWithdrawalRows(rows) {
     // Guard: withdrawalNo must not look like an internal whd_* ID or ISO date
     var whdlRaw = String(r[iWhdl]||'').trim();
     if (/^whd_/.test(whdlRaw) || /^\d{4}-\d{2}-\d{2}/.test(whdlRaw)) whdlRaw = '';
-    // Skip legacy split-parent rows written to WITHDRAWAL by old code.
-    // These rows have WithdrawalNo = "SPLIT-..." and are now tracked exclusively
-    // via the SPLIT-PARENT tab → parseSplitParentRows → STATE.withdrawals.
-    // Counting them here too would double-deduct every split from parent stock.
-    if (/^SPLIT-/i.test(whdlRaw)) continue;
     // Resolve width/length: prefer new individual columns; fall back to parsing old Size column
     var _wRaw  = iWidth >= 0 ? String(r[iWidth]  || '').trim() : '';
     var _wuRaw = iWUnit >= 0 ? String(r[iWUnit] || '').trim() : '';
@@ -2997,12 +2992,6 @@ function parseReceivedRows(rows) {
     if (iDel >= 0 && _isDeletedFlag(r[iDel])) continue;   // skip soft-deleted
     var code = String(iCode >= 0 ? r[iCode] : '').trim();
     if (!code) continue;
-    // Skip legacy split-child rows written to RECEIVED by old code.
-    // These rows have MRR No = "SPLIT-..." and are now tracked exclusively
-    // via the SPLIT-CHILD tab → parseSplitChildRows → STATE.received.
-    // Counting them here too would double the credit for every split.
-    var mrrVal = iMrr >= 0 ? String(r[iMrr]||'').trim() : '';
-    if (/^SPLIT-/i.test(mrrVal)) continue;
     var rawId = iId >= 0 ? String(r[iId]||'').trim() : '';
     var legacyNoId = !rawId;
     // BUGFIX v3.27: legacy received rows missing an ID would all share id=''
@@ -3917,13 +3906,20 @@ function deleteWithdrawal(id) {
     return;
   }
 
-  if (r.source === 'backend' || r.source === 'pending') {
+  // Always attempt a backend delete if the row has a real backend ID.
+  // 'Local' rows that were saved by old code still exist in the sheet and
+  // will ghost-reappear on the next auto-refresh unless deleted from backend.
+  // Only skip the backend call for IDs that are provably browser-only:
+  //   spp_local_* / spc_local_* -> created by split, never persisted
+  //   whd_legacy_* -> synthesized client-side, no sheet row
+  var isBrowserOnlyId = /^(spp_local_|spc_local_|whd_legacy_)/.test(String(id));
+  if (!isBrowserOnlyId) {
     postToScript({action:'delete_withdrawal', id: id},
-      function(){ delete _wdrawPendingDeletes[String(id)]; /* success */ },
+      function(){ delete _wdrawPendingDeletes[String(id)]; },
       function(err){ delete _wdrawPendingDeletes[String(id)]; showToast('Deleted locally — backend delete failed: '+err, 'error'); });
   } else {
     delete _wdrawPendingDeletes[String(id)];
-    showToast('Deleted (local only)', 'success');
+    showToast('Deleted (local only — was never synced to sheet)', 'success');
   }
 }
 
@@ -4470,12 +4466,15 @@ function deleteReceived(id) {
     return;
   }
 
-  if (r.source === 'backend' || r.source === 'pending') {
+  // Same ghost-return fix as deleteWithdrawal: always call backend delete
+  // if the ID is a real backend ID, even if source is 'local'.
+  var isBrowserOnlyId = /^(spc_local_|spp_local_|rec_legacy_)/.test(String(id));
+  if (!isBrowserOnlyId) {
     postToScript({action:'delete_received', id: id},
-      function(){ /* success toast suppressed per user request */ },
+      function(){ /* success */ },
       function(err){ showToast('Deleted locally — backend delete failed: '+err, 'error'); });
   } else {
-    showToast('Deleted (local only)', 'success');
+    showToast('Deleted (local only — was never synced to sheet)', 'success');
   }
 }
 
