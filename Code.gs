@@ -1123,15 +1123,17 @@ function _writeStockMonitorContent(ss, sh) {
     recMap[code] = (recMap[code] || 0) + (parseFloat(r[8]) || 0);  // col I — Qty
   });
 
-  // Withdrawn: sum qty per itemCode (col B=1, qty=col E=4, Deleted=col J=9)
+  // Withdrawn: sum qty per itemCode
+  // WITHDRAWAL new layout: [Date(0),ItemCode(1),Desc(2),Width(3),W-UM(4),Length(5),L-UM(6),
+  //   Qty(7),WithdrawalNo(8),Customer(9),Remarks(10),ID(11),Deleted(12),DeletedAt(13),DeletedBy(14)]
   // Plus SPLIT-PARENT rolls consumed by splits (new W/W-UM/L/L-UM format,
   // qty in col I=8, Deleted in col N=13).
   var whdMap = {};
   whdData.forEach(function(r) {
     var code    = String(r[1] || '').trim();
-    var deleted = r[9];
+    var deleted = r[12];                           // col M — Deleted (new layout)
     if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
-    whdMap[code] = (whdMap[code] || 0) + (parseFloat(r[4]) || 0);
+    whdMap[code] = (whdMap[code] || 0) + (parseFloat(r[7]) || 0);  // col H — Qty
   });
   spData.forEach(function(r) {
     var code    = String(r[2] || '').trim();       // col C — ItemCode
@@ -1193,13 +1195,15 @@ function _writeStockMonitorContent(ss, sh) {
     yrByItem[code].received += parseFloat(r[4]) || 0;
   });
 
-  // YARDSWITHDRAWN: col C=itemId(2), col E=yards(4), Deleted col I(8)
+  // YARDSWITHDRAWN new layout:
+  // [Date(0),CoreNo(1),ItemID(2),Width(3),WidthUnit(4),Yards(5),LengthUnit(6),
+  //  Ref(7),Customer(8),ID(9),Deleted(10),DeletedAt(11),DeletedBy(12)]
   ywData.forEach(function(r) {
     var code    = String(r[2] || '').trim();   // ItemID column
-    var deleted = r[8];
+    var deleted = r[10];                       // col K — Deleted (new layout)
     if (!code || deleted === true || String(deleted).toLowerCase() === 'true') return;
     if (!yrByItem[code]) yrByItem[code] = {received: 0, withdrawn: 0};
-    yrByItem[code].withdrawn += parseFloat(r[4]) || 0;
+    yrByItem[code].withdrawn += parseFloat(r[5]) || 0;  // col F — Yards
   });
 
   var yardsRows = [];
