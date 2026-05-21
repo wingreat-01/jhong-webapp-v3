@@ -2626,20 +2626,35 @@ function parseWithdrawalRows(rows) {
   var iId    = col1(['id']);
   var iDel   = col1(['deleted']);
   // Positional fallbacks — new canonical WITHDRAWAL_HEADER order:
-  // [Date(0), ItemCode(1), Description(2), Width(3), W-UM(4), Length(5), L-UM(6), Qty(7), WithdrawalNo(8), Customer(9), Remarks(10), ID(11), Deleted(12)]
+  // [Date(0), ItemCode(1), Description(2), Width(3), W-UM(4), Length(5), L-UM(6), Qty(7), WithdrawalNo(8), Customer(9), Remarks(10), ID(11), Deleted(12), DeletedAt(13), DeletedBy(14)]
+  // These fallbacks only apply when the header row has NO matching column name.
+  // For pre-migration sheets (old layout without Width/W-UM/Length/L-UM columns),
+  // iWidth/iWUnit/iLen/iLUnit are left at -1 so the legacy Size fallback runs instead.
   if (iDate  < 0) iDate  = 0;
   if (iCode  < 0) iCode  = 1;
   if (iDesc  < 0) iDesc  = 2;
-  if (iWidth < 0) iWidth = 3;
-  if (iWUnit < 0) iWUnit = 4;
-  if (iLen   < 0) iLen   = 5;
-  if (iLUnit < 0) iLUnit = 6;
-  if (iQty   < 0) iQty   = 7;
-  if (iWhdl  < 0) iWhdl  = 8;
-  if (iCust  < 0) iCust  = 9;
-  if (iRem   < 0) iRem   = 10;
-  if (iId    < 0) iId    = 11;
-  if (iDel   < 0) iDel   = 12;
+  // Only apply positional fallbacks for width/length when the header has 13+ columns
+  // (i.e. the migrated layout). Pre-migration sheets have only ~12 cols and no Width col.
+  if (header.length >= 13) {
+    if (iWidth < 0) iWidth = 3;
+    if (iWUnit < 0) iWUnit = 4;
+    if (iLen   < 0) iLen   = 5;
+    if (iLUnit < 0) iLUnit = 6;
+    if (iQty   < 0) iQty   = 7;
+    if (iWhdl  < 0) iWhdl  = 8;
+    if (iCust  < 0) iCust  = 9;
+    if (iRem   < 0) iRem   = 10;
+    if (iId    < 0) iId    = 11;
+    if (iDel   < 0) iDel   = 12;
+  } else {
+    // Pre-migration layout: [Date(0), ItemCode(1), Desc(2), Size(3), Qty(4), WithdrawalNo(5), Customer(6), Remarks(7), ID(8), Deleted(9)]
+    if (iQty   < 0) iQty   = 4;
+    if (iWhdl  < 0) iWhdl  = 5;
+    if (iCust  < 0) iCust  = 6;
+    if (iRem   < 0) iRem   = 7;
+    if (iId    < 0) iId    = 8;
+    if (iDel   < 0) iDel   = 9;
+  }
   console.log('[Withdrawal] header:', rows[0]);
   console.log('[Withdrawal] col map: iWidth='+iWidth+' iLen='+iLen+' iQty='+iQty+' iWhdl='+iWhdl+' iId='+iId+' iDel='+iDel);
   if (rows[1]) console.log('[Withdrawal] row1 raw:', rows[1]);
