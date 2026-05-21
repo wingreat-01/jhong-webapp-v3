@@ -1996,7 +1996,8 @@ var STATE = {
   served: [],             // [{id, rowKey, date, jobOrder, itemId, width, length, qty, unit, customer, urgency, status, sales, servedAt, source}]
   partialRolls: [],       // [{id, date, withdrawalId, code, width, widthUnit, length, lengthUnit, qty, ref, size}]
   partialRollsWithdrawals: [], // [{id, date, code, size, qty, ref, note}]
-  _prSubTab: 'ledger'    // active sub-tab inside PARTIAL ROLLS panel: 'ledger' | 'withdraw'
+  _prSubTab: 'ledger',    // active sub-tab inside PARTIAL ROLLS panel: 'ledger' | 'withdraw'
+  splitParent: []         // SPLIT-PARENT rows for reference/audit only (NOT used in stock calculations)
 };
 
 // ---------- localStorage ----------
@@ -2394,22 +2395,22 @@ function syncNow(opts) {
     );
   }));
 
-  // ── SPLIT-PARENT → merge into STATE.withdrawals so sumWithdrawnFor deducts splits ──
-  // SPLIT-PARENT rows record every parent roll consumed during a split.
-  // Without this, availableFor() ignores splits and stock never decreases.
+  // ── SPLIT-PARENT → reference/audit only; NOT merged into STATE.withdrawals ──
+  // Parent rolls are ALSO saved to WITHDRAWAL as normal withdrawals.
+  // WITHDRAWAL is the single source of truth for stock calculations.
+  // Merging SPLIT-PARENT here would double-count those same rolls.
   total++;
   jobs.push(new Promise(function(resolve){
     if (!STATE.config.proxyUrl) { bumpProg(); resolve(); return; }
     fetchFromAppsScript('read_split_parent',
       function(rows){
         var parsed = parseSplitParentRows(rows || []);
-        // Always replace previously merged split-parent rows even if backend
-        // is now empty, so a deleted/empty SPLIT-PARENT sheet clears stale ones.
+        STATE.splitParent = parsed;
+        // Clean up stale entries from old sessions that had them merged in
         STATE.withdrawals = (STATE.withdrawals || []).filter(function(w){
           return w.source !== 'split-parent';
         });
-        parsed.forEach(function(sp){ STATE.withdrawals.push(sp); });
-        console.log('[split-parent] merged '+parsed.length+' rows into STATE.withdrawals');
+        console.log('[split-parent] loaded '+parsed.length+' rows (reference only)');
         bumpProg(); resolve();
       },
       function(err){
@@ -2626,35 +2627,20 @@ function parseWithdrawalRows(rows) {
   var iId    = col1(['id']);
   var iDel   = col1(['deleted']);
   // Positional fallbacks — new canonical WITHDRAWAL_HEADER order:
-  // [Date(0), ItemCode(1), Description(2), Width(3), W-UM(4), Length(5), L-UM(6), Qty(7), WithdrawalNo(8), Customer(9), Remarks(10), ID(11), Deleted(12), DeletedAt(13), DeletedBy(14)]
-  // These fallbacks only apply when the header row has NO matching column name.
-  // For pre-migration sheets (old layout without Width/W-UM/Length/L-UM columns),
-  // iWidth/iWUnit/iLen/iLUnit are left at -1 so the legacy Size fallback runs instead.
+  // [Date(0), ItemCode(1), Description(2), Width(3), W-UM(4), Length(5), L-UM(6), Qty(7), WithdrawalNo(8), Customer(9), Remarks(10), ID(11), Deleted(12)]
   if (iDate  < 0) iDate  = 0;
   if (iCode  < 0) iCode  = 1;
   if (iDesc  < 0) iDesc  = 2;
-  // Only apply positional fallbacks for width/length when the header has 13+ columns
-  // (i.e. the migrated layout). Pre-migration sheets have only ~12 cols and no Width col.
-  if (header.length >= 13) {
-    if (iWidth < 0) iWidth = 3;
-    if (iWUnit < 0) iWUnit = 4;
-    if (iLen   < 0) iLen   = 5;
-    if (iLUnit < 0) iLUnit = 6;
-    if (iQty   < 0) iQty   = 7;
-    if (iWhdl  < 0) iWhdl  = 8;
-    if (iCust  < 0) iCust  = 9;
-    if (iRem   < 0) iRem   = 10;
-    if (iId    < 0) iId    = 11;
-    if (iDel   < 0) iDel   = 12;
-  } else {
-    // Pre-migration layout: [Date(0), ItemCode(1), Desc(2), Size(3), Qty(4), WithdrawalNo(5), Customer(6), Remarks(7), ID(8), Deleted(9)]
-    if (iQty   < 0) iQty   = 4;
-    if (iWhdl  < 0) iWhdl  = 5;
-    if (iCust  < 0) iCust  = 6;
-    if (iRem   < 0) iRem   = 7;
-    if (iId    < 0) iId    = 8;
-    if (iDel   < 0) iDel   = 9;
-  }
+  if (iWidth < 0) iWidth = 3;
+  if (iWUnit < 0) iWUnit = 4;
+  if (iLen   < 0) iLen   = 5;
+  if (iLUnit < 0) iLUnit = 6;
+  if (iQty   < 0) iQty   = 7;
+  if (iWhdl  < 0) iWhdl  = 8;
+  if (iCust  < 0) iCust  = 9;
+  if (iRem   < 0) iRem   = 10;
+  if (iId    < 0) iId    = 11;
+  if (iDel   < 0) iDel   = 12;
   console.log('[Withdrawal] header:', rows[0]);
   console.log('[Withdrawal] col map: iWidth='+iWidth+' iLen='+iLen+' iQty='+iQty+' iWhdl='+iWhdl+' iId='+iId+' iDel='+iDel);
   if (rows[1]) console.log('[Withdrawal] row1 raw:', rows[1]);
@@ -6973,9 +6959,8 @@ function _readWithdrawalsWithBackfill(done, failed) {
                 var parsed2 = parseWithdrawalRows(rows2);
                 if (parsed2) {
                   parsed2 = _filterPendingDeletes(parsed2);
-                  // Preserve split-parent records (loaded by the separate
-                  // read_split_parent job) so concurrent jobs don't race.
-                  var localW2 = STATE.withdrawals.filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
+                  // Preserve local (unsaved) records only.
+                  var localW2 = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
                   STATE.withdrawals = parsed2.concat(localW2);
                   try { renderHistory(); renderStocks(); } catch(e){}
                 }
@@ -6989,7 +6974,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
             console.warn('backfill_withdrawal_ids failed:', err);
             if (parsed) {
               parsed = _filterPendingDeletes(parsed);
-              var localWe = STATE.withdrawals.filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
+              var localWe = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
               STATE.withdrawals = parsed.concat(localWe);
               try { renderHistory(); renderStocks(); } catch(e){}
             }
@@ -7000,7 +6985,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
       }
       if (parsed) {
         parsed = _filterPendingDeletes(parsed);
-        var localW = STATE.withdrawals.filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
+        var localW = STATE.withdrawals.filter(function(r){ return r.source === 'local'; });
         STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); renderStocks(); } catch(e){}
       }
@@ -7266,10 +7251,9 @@ function _wdrawAutoRefreshTick() {
         // Strip any row the user just deleted — prevents ghost-record reappearance
         // while the delete_withdrawal request is still in-flight to the backend.
         parsed = _filterPendingDeletes(parsed);
-        // Preserve local AND split-parent records — the auto-refresh only
-        // owns 'backend' rows from the WITHDRAWAL tab. Split-parent rows
-        // live in the SPLIT-PARENT tab and are owned by their own sync job.
-        var localW = (STATE.withdrawals || []).filter(function(r){ return r.source === 'local' || r.source === 'split-parent'; });
+        // Preserve local records only — split-parent rows are no longer
+        // merged into STATE.withdrawals (WITHDRAWAL tab is the stock source of truth).
+        var localW = (STATE.withdrawals || []).filter(function(r){ return r.source === 'local'; });
         STATE.withdrawals = _dedupeWithdrawals(parsed.concat(localW));
         try { renderHistory(); } catch(e){}
         try { renderStocks();  } catch(e){}
@@ -8462,9 +8446,10 @@ function confirmSplitRoll(){
   var pRecId = 'spp_local_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
   var cRecId = 'spc_local_' + (Date.now() + 1) + '_' + Math.random().toString(36).substr(2,5);
 
-  // ── 1) Parent consumption — pushed into STATE.withdrawals tagged
-  // 'split-parent' so sumWithdrawnFor() deducts it from balance. The actual
-  // persistence happens in the SPLIT-PARENT backend tab (not WITHDRAWAL).
+  // ── 1) Parent consumption — stored in STATE.splitParent for reference only.
+  // The parent roll withdrawal is ALREADY in STATE.withdrawals (and the WITHDRAWAL
+  // tab) because the user submits a normal withdrawal before splitting.
+  // Do NOT push into STATE.withdrawals — that would double-count the parent roll.
   var pRec = {
     id:          pRecId,
     date:        date,
@@ -8482,7 +8467,8 @@ function confirmSplitRoll(){
                  + (note ? '  ·  ' + note : ''),
     source:      'split-parent'
   };
-  STATE.withdrawals.unshift(pRec);
+  if (!STATE.splitParent) STATE.splitParent = [];
+  STATE.splitParent.unshift(pRec);
 
   // ── 2) Child credit — pushed into STATE.received tagged 'split-child'
   // so sumReceivedFor() adds it to balance. Persisted to SPLIT-CHILD tab.
@@ -8517,9 +8503,9 @@ function confirmSplitRoll(){
   }
 
   // ── Single atomic backend call ─────────────────────────────────────────────
-  // The backend save_split handler writes all 5 tabs in one round-trip:
-  //   SPLIT-PARENT (deduction log) · SPLIT-CHILD (credit log)
-  //   WITHDRAWAL (stock formula ↓) · RECEIVED (stock formula ↑) · SPLIT (audit)
+  // The backend save_split handler writes 2 tabs:
+  //   SPLIT-PARENT (audit reference) · SPLIT-CHILD (child credit log)
+  // The WITHDRAWAL deduction was already submitted as a normal withdrawal before splitting.
   showToast('Posting split ' + splitId + ' to JHONG BACKEND...', 'success');
 
   var splitRec = {
