@@ -758,21 +758,34 @@ function _handleSaveSplit(sp) {
   var spParentId   = _genId('spp');
   var spChildId    = _genId('spc');
 
-  // SPLIT-PARENT — parent roll consumed (treated as a withdrawal from balance
-  // via frontend parseSplitParentRows merging into STATE.withdrawals)
+  // ── RECEIVED tab — child rolls produced (authoritative stock credit) ──
+  // RECEIVED is the single source of truth for child-roll stock, the same way
+  // WITHDRAWAL is the single source of truth for parent-roll deductions.
+  var recId = _genId('rec');
+  var cSizeForRec = (cW && cL) ? (cW + (cWU ? ' ' + cWU : '') + ' x ' + cL + (cLU ? ' ' + cLU : '')) : (sp.childSize || '');
+  _getReceivedSheet().appendRow([
+    spDate, cCode, cDesc, cSizeForRec, cQty,
+    splitId,
+    'Internal — Roll Split',
+    'Split from ' + pCode + (note ? '  ·  ' + note : ''),
+    recId, false, '', ''
+  ]);
+
+  // ── SPLIT-PARENT — audit reference only (parent roll consumed) ──
+  // Authoritative deduction is in WITHDRAWAL (submitted before splitting).
   _getSplitParentSheet().appendRow([
     spDate, splitId, pCode, pDesc, pW, pWU, pL, pLU,
     pQty, whdlNo, customer, note, spParentId, false, '', ''
   ]);
 
-  // SPLIT-CHILD — child rolls produced (treated as received items added to
-  // balance via frontend parseSplitChildRows merging into STATE.received)
+  // ── SPLIT-CHILD — audit reference only (child rolls produced) ──
+  // Authoritative credit is in RECEIVED (written above).
   _getSplitChildSheet().appendRow([
     spDate, splitId, cCode, cDesc, cW, cWU, cL, cLU,
     cQty, splitId, 'Internal — Roll Split', note, spChildId, false, '', ''
   ]);
 
-  return _json({ok:true, splitId:splitId, splitParentId:spParentId, splitChildId:spChildId});
+  return _json({ok:true, splitId:splitId, splitParentId:spParentId, splitChildId:spChildId, receivedId:recId});
 }
 
 function _openSS() {

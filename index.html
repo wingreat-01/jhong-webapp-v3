@@ -1997,7 +1997,8 @@ var STATE = {
   partialRolls: [],       // [{id, date, withdrawalId, code, width, widthUnit, length, lengthUnit, qty, ref, size}]
   partialRollsWithdrawals: [], // [{id, date, code, size, qty, ref, note}]
   _prSubTab: 'ledger',    // active sub-tab inside PARTIAL ROLLS panel: 'ledger' | 'withdraw'
-  splitParent: []         // SPLIT-PARENT rows for reference/audit only (NOT used in stock calculations)
+  splitParent: [],        // SPLIT-PARENT rows for reference/audit only (NOT used in stock calculations)
+  splitChild: []          // SPLIT-CHILD rows for reference/audit only (NOT used in stock calculations)
 };
 
 // ---------- localStorage ----------
@@ -2420,20 +2421,22 @@ function syncNow(opts) {
     );
   }));
 
-  // ── SPLIT-CHILD → merge into STATE.received so sumReceivedFor credits splits ──
-  // SPLIT-CHILD rows record every batch of child rolls produced during a split.
-  // Without this, availableFor() ignores splits and child stock never increases.
+  // ── SPLIT-CHILD → reference/audit only; NOT merged into STATE.received ──
+  // Child rolls are written to the RECEIVED tab as authoritative stock records.
+  // RECEIVED is the single source of truth for child-roll credits.
+  // Merging SPLIT-CHILD here would double-count those same rolls.
   total++;
   jobs.push(new Promise(function(resolve){
     if (!STATE.config.proxyUrl) { bumpProg(); resolve(); return; }
     fetchFromAppsScript('read_split_child',
       function(rows){
         var parsed = parseSplitChildRows(rows || []);
+        STATE.splitChild = parsed;
+        // Clean up stale entries from old sessions that had them merged in
         STATE.received = (STATE.received || []).filter(function(r){
           return r.source !== 'split-child';
         });
-        parsed.forEach(function(sc){ STATE.received.push(sc); });
-        console.log('[split-child] merged '+parsed.length+' rows into STATE.received');
+        console.log('[split-child] loaded '+parsed.length+' rows (reference only)');
         bumpProg(); resolve();
       },
       function(err){
@@ -6884,9 +6887,8 @@ function _readReceivedWithBackfill(done, failed) {
               function(rows2){
                 var parsed2 = parseReceivedRows(rows2);
                 if (parsed2) {
-                  // Preserve split-child records (loaded by the separate
-                  // read_split_child job) so the concurrent jobs don't race.
-                  var local2 = STATE.received.filter(function(r){ return r.source === 'local' || r.source === 'split-child'; });
+                  // Preserve local (unsaved) records only.
+                  var local2 = STATE.received.filter(function(r){ return r.source === 'local'; });
                   STATE.received = parsed2.concat(local2);
                   try { renderReceived(); renderStocks(); } catch(e){}
                 }
@@ -6900,7 +6902,7 @@ function _readReceivedWithBackfill(done, failed) {
             // Backfill failed — fall back to whatever we already parsed so the UI works.
             console.warn('backfill_received_ids failed:', err);
             if (parsed) {
-              var local = STATE.received.filter(function(r){ return r.source === 'local' || r.source === 'split-child'; });
+              var local = STATE.received.filter(function(r){ return r.source === 'local'; });
               STATE.received = parsed.concat(local);
               try { renderReceived(); renderStocks(); } catch(e){}
             }
@@ -6911,7 +6913,7 @@ function _readReceivedWithBackfill(done, failed) {
       }
       // Normal path — no legacy rows or already attempted backfill.
       if (parsed) {
-        var local = STATE.received.filter(function(r){ return r.source === 'local' || r.source === 'split-child'; });
+        var local = STATE.received.filter(function(r){ return r.source === 'local'; });
         STATE.received = parsed.concat(local);
         try { renderReceived(); renderStocks(); } catch(e){}
       }
@@ -8470,8 +8472,11 @@ function confirmSplitRoll(){
   if (!STATE.splitParent) STATE.splitParent = [];
   STATE.splitParent.unshift(pRec);
 
-  // ── 2) Child credit — pushed into STATE.received tagged 'split-child'
-  // so sumReceivedFor() adds it to balance. Persisted to SPLIT-CHILD tab.
+  // ── 2) Child credit — stored in STATE.splitChild for reference only.
+  // The backend writes child rolls directly to the RECEIVED tab as a normal
+  // received record. Do NOT push into STATE.received here — it will arrive
+  // on the next sync from RECEIVED (the authoritative source).
+  // We do push a local pending record so stock counts update immediately in the UI.
   var cRec = {
     id:       cRecId,
     date:     date,
@@ -8486,9 +8491,11 @@ function confirmSplitRoll(){
     supplier: 'Internal — Roll Split',
     remarks:  'From ' + pCode + ' [' + splitId + ']'
               + (note ? '  ·  ' + note : ''),
-    source:   'split-child'
+    source:   'local'   // treated as local pending until next sync reads it from RECEIVED
   };
   STATE.received.unshift(cRec);
+  if (!STATE.splitChild) STATE.splitChild = [];
+  STATE.splitChild.unshift(Object.assign({}, cRec, {source: 'split-child'}));
 
   saveState();
   try { renderHistory();  } catch(e){}
@@ -8536,15 +8543,17 @@ function confirmSplitRoll(){
 
   postToScript({action: 'save_split', record: splitRec},
     function(res) {
-      // Adopt the backend-assigned IDs so the next sync's tagged-source
-      // replacement matches cleanly without double rows.
+      // Adopt the backend-assigned IDs.
       if (res && res.splitParentId) pRec.id = res.splitParentId;
       if (res && res.splitChildId)  cRec.id = res.splitChildId;
+      // Update the local pending cRec with the receivedId the backend assigned,
+      // so the next sync can match and replace it cleanly from the RECEIVED tab.
+      if (res && res.receivedId) cRec.id = res.receivedId;
       saveState();
       try { renderHistory();  } catch(e){}
       try { renderReceived(); } catch(e){}
       try { renderStocks();   } catch(e){}
-      showToast('✓ Split ' + splitId + ' synced → SPLIT-PARENT + SPLIT-CHILD.', 'success');
+      showToast('✓ Split ' + splitId + ' synced → WITHDRAWAL + RECEIVED (+ audit: SPLIT-PARENT, SPLIT-CHILD).', 'success');
     },
     function(err) {
       // Keep local source tags; next successful sync will replace them.
