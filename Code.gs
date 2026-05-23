@@ -720,7 +720,11 @@ function _handleSaveSplit(sp) {
   var tz        = Session.getScriptTimeZone() || 'Asia/Manila';
   var spDate    = sp.date || Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   var splitId   = String(sp.splitId      || _genId('SPLIT'));
-  var whdlNo    = String(sp.withdrawalNo || splitId);
+  // If no user-supplied withdrawal number, generate one that does NOT start with
+  // "SPLIT-" so the stock calculator does not skip it (SPLIT- prefix is reserved
+  // for legacy rows that were tracked in SPLIT-PARENT instead of WITHDRAWAL).
+  var whdlNo    = String(sp.withdrawalNo || '').trim();
+  if (!whdlNo || /^SPLIT-/i.test(whdlNo)) whdlNo = 'WD-' + splitId;
   var customer  = String(sp.customer     || 'Internal — Roll Split');
   var note      = _safeText(sp.note      || '');
   var pCode     = String(sp.parentCode);
@@ -758,9 +762,18 @@ function _handleSaveSplit(sp) {
   var spParentId   = _genId('spp');
   var spChildId    = _genId('spc');
 
+  // ── WITHDRAWAL tab — parent roll consumed (authoritative stock deduction) ──
+  // Split Roll atomically deducts the parent here so the user does NOT need
+  // to submit a separate withdrawal before splitting.
+  var whdId = _genId('whd');
+  _getWithdrawalSheet().appendRow([
+    spDate, pCode, pDesc, pW, pWU, pL, pLU,
+    pQty, whdlNo, customer,
+    'Split into ' + cQty + '× ' + cCode + ' [' + splitId + ']' + (note ? '  ·  ' + note : ''),
+    whdId, false, '', ''
+  ]);
+
   // ── RECEIVED tab — child rolls produced (authoritative stock credit) ──
-  // RECEIVED is the single source of truth for child-roll stock, the same way
-  // WITHDRAWAL is the single source of truth for parent-roll deductions.
   var recId = _genId('rec');
   var cSizeForRec = (cW && cL) ? (cW + (cWU ? ' ' + cWU : '') + ' x ' + cL + (cLU ? ' ' + cLU : '')) : (sp.childSize || '');
   _getReceivedSheet().appendRow([
@@ -771,8 +784,7 @@ function _handleSaveSplit(sp) {
     recId, false, '', ''
   ]);
 
-  // ── SPLIT-PARENT — audit reference only (parent roll consumed) ──
-  // Authoritative deduction is in WITHDRAWAL (submitted before splitting).
+  // ── SPLIT-PARENT — audit reference (parent roll consumed) ──
   _getSplitParentSheet().appendRow([
     spDate, splitId, pCode, pDesc, pW, pWU, pL, pLU,
     pQty, whdlNo, customer, note, spParentId, false, '', ''
@@ -785,7 +797,7 @@ function _handleSaveSplit(sp) {
     cQty, splitId, 'Internal — Roll Split', note, spChildId, false, '', ''
   ]);
 
-  return _json({ok:true, splitId:splitId, splitParentId:spParentId, splitChildId:spChildId, receivedId:recId});
+  return _json({ok:true, splitId:splitId, withdrawalId:whdId, splitParentId:spParentId, splitChildId:spChildId, receivedId:recId});
 }
 
 function _openSS() {
