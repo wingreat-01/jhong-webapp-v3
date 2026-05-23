@@ -2513,6 +2513,17 @@ function parseItemcodeCSV(csvText) {
   return parseItemcodeRows(rows);
 }
 
+// Reject ISO date strings (e.g. "2026-07-07T16:00:00.000Z") that sometimes
+// appear in width/length/size columns when Google Sheets serialises a date cell.
+function _sanitizeSizeVal(v) {
+  if (!v) return v;
+  // ISO datetime: 2026-07-07T16:00:00.000Z  or  2026-07-07T16:00:00Z
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)) return '';
+  // Plain date: 2026-07-07
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
+  return v;
+}
+
 function parseItemcodeRows(rows) {
   if (!rows || rows.length < 2) return [];
   var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
@@ -2569,19 +2580,19 @@ function parseItemcodeRows(rows) {
     var size = '';
     var wVal = '', wUnit = '', lVal = '', lUnit = '';
     if (hasSplitSize) {
-      wVal  = String(cols[widthValIdx]||'').trim();
-      wUnit = String(widthUnitIdx  >= 0 ? cols[widthUnitIdx] ||'' : '').trim();
-      lVal  = String(cols[lengthValIdx]||'').trim();
-      lUnit = String(lengthUnitIdx >= 0 ? cols[lengthUnitIdx]||'' : '').trim();
+      wVal  = _sanitizeSizeVal(String(cols[widthValIdx]||'').trim());
+      wUnit = _sanitizeSizeVal(String(widthUnitIdx  >= 0 ? cols[widthUnitIdx] ||'' : '').trim());
+      lVal  = _sanitizeSizeVal(String(cols[lengthValIdx]||'').trim());
+      lUnit = _sanitizeSizeVal(String(lengthUnitIdx >= 0 ? cols[lengthUnitIdx]||'' : '').trim());
       if (wVal || lVal) {
         var wPart = wVal + (wUnit ? wUnit : '');
         var lPart = lVal + (lUnit ? lUnit : '');
         size = (wPart && lPart) ? (wPart + ' x ' + lPart) : (wPart || lPart);
       } else if (sizeIdx !== -1) {
-        size = String(cols[sizeIdx]||'').trim();
+        size = _sanitizeSizeVal(String(cols[sizeIdx]||'').trim());
       }
     } else {
-      size = sizeIdx >= 0 ? String(cols[sizeIdx]||'').trim() : '';
+      size = sizeIdx >= 0 ? _sanitizeSizeVal(String(cols[sizeIdx]||'').trim()) : '';
     }
 
     var origQty = 0;
@@ -2664,10 +2675,10 @@ function parseWithdrawalRows(rows) {
     var whdlRaw = String(r[iWhdl]||'').trim();
     if (/^whd_/.test(whdlRaw) || /^\d{4}-\d{2}-\d{2}/.test(whdlRaw)) whdlRaw = '';
     // Resolve width/length: prefer new individual columns; fall back to parsing old Size column
-    var _wRaw  = iWidth >= 0 ? String(r[iWidth]  || '').trim() : '';
-    var _wuRaw = iWUnit >= 0 ? String(r[iWUnit] || '').trim() : '';
-    var _lRaw  = iLen   >= 0 ? String(r[iLen]   || '').trim() : '';
-    var _luRaw = iLUnit >= 0 ? String(r[iLUnit] || '').trim() : '';
+    var _wRaw  = _sanitizeSizeVal(iWidth >= 0 ? String(r[iWidth]  || '').trim() : '');
+    var _wuRaw = _sanitizeSizeVal(iWUnit >= 0 ? String(r[iWUnit] || '').trim() : '');
+    var _lRaw  = _sanitizeSizeVal(iLen   >= 0 ? String(r[iLen]   || '').trim() : '');
+    var _luRaw = _sanitizeSizeVal(iLUnit >= 0 ? String(r[iLUnit] || '').trim() : '');
     // Legacy fallback: parse old Size string (e.g. "48 x 50")
     if (!_wRaw && !_lRaw && iSize >= 0) {
       var _sz = String(r[iSize]||'').trim();
@@ -3213,7 +3224,9 @@ function fillItemDetailsByCode(v) {
   var item = STATE.items.find(function(it){ return it.code.toLowerCase() === v.toLowerCase(); });
   if (item) {
     document.getElementById('wDesc').value = item.desc || '';
-    document.getElementById('wSize').value = item.size || (item.width ? (item.width+(item.widthUnit?' '+item.widthUnit:'')+(item.length?' × '+item.length+(item.lengthUnit?' '+item.lengthUnit:''):'')) : '');
+    var _iSz = _sanitizeSizeVal(item.size||'');
+    var _iW  = _sanitizeSizeVal(item.width||'');
+    document.getElementById('wSize').value = _iSz || (_iW ? (_iW+(item.widthUnit?' '+item.widthUnit:'')+(item.length?' × '+item.length+(item.lengthUnit?' '+item.lengthUnit:''):'')) : '');
     showAvailPanel(item);
   } else {
     document.getElementById('wDesc').value = '';
@@ -3830,7 +3843,7 @@ function editWithdrawal(id) {
   document.getElementById('wDate').value      = w.date && w.date !== '—' ? toIsoDate(w.date) : '';
   document.getElementById('wItemCode').value  = w.itemCode || '';
   document.getElementById('wDesc').value      = w.desc || '';
-  document.getElementById('wSize').value      = w.size || (w.width ? (w.width+(w.widthUnit?' '+w.widthUnit:'')+(w.length?' × '+w.length+(w.lengthUnit?' '+w.lengthUnit:''):'')) : '');
+  document.getElementById('wSize').value      = _sanitizeSizeVal(w.size||'') || (_sanitizeSizeVal(w.width||'') ? (_sanitizeSizeVal(w.width)+(w.widthUnit?' '+w.widthUnit:'')+(w.length?' × '+w.length+(w.lengthUnit?' '+w.lengthUnit:''):'')) : '');
   document.getElementById('wQty').value       = w.qty || '';
   document.getElementById('wWhdlNo').value    = w.withdrawalNo || '';
   document.getElementById('wCustomer').value  = w.customer || '';
@@ -4046,9 +4059,9 @@ function renderHistory() {
          + '<td style="white-space:nowrap">'+escapeHtml(w.date||'—')+'</td>'
          + '<td class="td-code">'+escapeHtml(w.itemCode||'—')+'</td>'
          + '<td>'+escapeHtml(w.desc||'—')+'</td>'
-         + '<td>'+escapeHtml(w.width||'—')+'</td>'
+         + '<td>'+escapeHtml(_sanitizeSizeVal(w.width||'')||'—')+'</td>'
          + '<td style="font-size:11px;color:#546E7A;text-align:center">'+escapeHtml(w.widthUnit||'')+'</td>'
-         + '<td>'+escapeHtml(w.length||'—')+'</td>'
+         + '<td>'+escapeHtml(_sanitizeSizeVal(w.length||'')||'—')+'</td>'
          + '<td style="font-size:11px;color:#546E7A;text-align:center">'+escapeHtml(w.lengthUnit||'')+'</td>'
          + '<td style="font-weight:700;color:#C62828">'+(w.qty||0)+'</td>'
          + '<td><span class="pill pill-blue">'+escapeHtml(w.withdrawalNo||'—')+'</span></td>'
