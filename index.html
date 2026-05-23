@@ -1875,8 +1875,8 @@ header{display:none!important}
       </div>
       <div class="form-group ac-wrap">
         <label class="form-label">Item ID *</label>
-        <input class="form-input" id="stysItemId" type="text" placeholder="Type to search ITEMCODE..." autocomplete="off" oninput="onStysItemInput()" onkeydown="onStysItemKey(event)" onfocus="onStysItemInput()" onblur="setTimeout(hideStysItemAC,180)">
-        <div class="ac-list" id="stysAcList"></div>
+        <input class="form-input" id="stysItemId" type="text" placeholder="Type to search ITEMCODE..." autocomplete="off" oninput="onStysItemInput()" onkeydown="onStysItemKey(event)" onfocus="onStysItemInput()" onblur="setTimeout(hideStysItemAC,300)">
+        <div class="ac-list" id="stysAcList" style="z-index:10020"></div>
       </div>
       <div class="form-group" style="grid-column:span 2">
         <label class="form-label">Item Description</label>
@@ -9209,7 +9209,7 @@ function _showStysAC(v) {
   }).slice(0,30);
   if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
   list.innerHTML = matches.map(function(it, i){
-    return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault()" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
+    return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault();pickStysItem(\''+escAttr(it.code)+'\')" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
       + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
       + ' <span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
       + '</div>';
