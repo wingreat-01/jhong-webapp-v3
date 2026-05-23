@@ -9156,7 +9156,12 @@ function openSendToYardsModal() {
   document.getElementById('stysCoreNo').value    = '';
   document.getElementById('stysItemId').value    = itemId;
   document.getElementById('stysItemDesc').value  = desc;
-  document.getElementById('stysWidth').value     = width;
+  // Derive width from item code trailing number if available, else use form's size string
+  var _stysPreW = (function(){
+    var m2 = String(itemId||'').match(/-([0-9]+)\s*$/);
+    return m2 ? m2[1] : width;
+  })();
+  document.getElementById('stysWidth').value     = _stysPreW || width;
   document.getElementById('stysQtyYards').value  = '';
   // Show avail balance for the pre-filled item (if any)
   var _stysRow = document.getElementById('stysAvailRow');
@@ -9292,13 +9297,29 @@ function _stysShowAvail(code) {
     row.style.display = 'none';
   }
 }
+// Extract the trailing numeric width from an item code (e.g. "610-10-WHT-FH-24" → "24",
+// "1170-ECF-CLEAR-48" → "48"). Falls back to parsing match.size or match.width.
+function _stysWidthFromCode(code, match) {
+  // Try trailing number after last hyphen (most common pattern)
+  var m = String(code || '').match(/-([0-9]+)\s*$/);
+  if (m) return m[1];
+  // Fall back to item's size string width component
+  if (match) {
+    if (match.width) return String(match.width);
+    if (match.size) {
+      var sm = String(match.size).match(/^([0-9\.]+)/);
+      if (sm) return sm[1];
+    }
+  }
+  return '';
+}
 function onStysItemInput() {
   var v = (document.getElementById('stysItemId').value || '').trim();
   _showStysAC(v);
   var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
   if (match) {
     document.getElementById('stysItemDesc').value = match.desc || '';
-    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
+    document.getElementById('stysWidth').value = _stysWidthFromCode(v, match) || match.size || '';
     _stysShowAvail(v);
   } else {
     var avRow = document.getElementById('stysAvailRow');
@@ -9354,7 +9375,7 @@ function pickStysItem(code) {
   var match = (STATE.items || []).find(function(it){ return it.code === code; });
   if (match) {
     document.getElementById('stysItemDesc').value = match.desc || '';
-    document.getElementById('stysWidth').value = match.size || '';
+    document.getElementById('stysWidth').value = _stysWidthFromCode(code, match) || match.size || '';
     _stysShowAvail(code);
   }
   hideStysItemAC();
@@ -9370,7 +9391,7 @@ function _refreshStysAcActive(items) {
       var m = (STATE.items || []).find(function(it){ return it.code === code; });
       if (m) {
         document.getElementById('stysItemDesc').value = m.desc || '';
-        document.getElementById('stysWidth').value    = m.size || '';
+        document.getElementById('stysWidth').value    = _stysWidthFromCode(code, m) || m.size || '';
         _stysShowAvail(code);
       }
     }
