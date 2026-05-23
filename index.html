@@ -166,6 +166,15 @@ tbody td{padding:9px 12px;color:#263238;vertical-align:middle}
 .ac-row.nrsr .ac-desc{white-space:normal;color:#1B5E20;font-weight:600;line-height:1.35;text-overflow:clip;font-size:13px;background:#fff;border-radius:6px;padding:6px 10px;border:1px solid #C8E6C9;display:block;width:100%}
 .ac-row.nrsr .ac-desc:before{content:"DESCRIPTION: ";font-size:9px;font-weight:700;color:#558B2F;letter-spacing:0.6px;margin-right:4px;vertical-align:middle}
 .ac-qty{font-size:11px;color:#33691E;font-weight:700;flex-shrink:0}
+#stysAcList{border-color:#80CBC4;box-shadow:0 8px 24px rgba(0,105,92,0.18)}
+.ac-item{padding:9px 13px;cursor:pointer;border-bottom:1px solid #F1F8E9;display:flex;gap:10px;align-items:center;transition:background 0.13s,box-shadow 0.13s;outline:none}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover{background:#E0F2F1;box-shadow:inset 3px 0 0 #00897B}
+.ac-item.active{background:#B2DFDB;box-shadow:inset 3px 0 0 #00695C}
+.ac-item.active .ac-code{color:#004D40}
+.ac-item .ac-code{font-family:monospace;font-weight:700;color:#00695C;font-size:12px;flex-shrink:0;min-width:160px}
+.ac-item .ac-desc{font-size:12px;color:#607D8B;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-item .ac-qty{font-size:11px;font-weight:700;flex-shrink:0;margin-left:auto}
 
 /* Enlarged Withdraw-tab item-code autocomplete dropdown (#acList) for better readability */
 #acList,#tmyAcList{max-height:460px;min-width:640px;border-radius:10px;border-width:2px;box-shadow:0 12px 32px rgba(46,125,50,0.22)}
@@ -9308,13 +9317,17 @@ function _showStysAC(v) {
   list.innerHTML = matches.map(function(it, i){
     var avail = availableFor(it);
     var availColor = avail <= 0 ? '#C62828' : (avail < 5 ? '#E65100' : '#2E7D32');
-    return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault()" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
+    return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" data-code='+escAttr(it.code)+'" onmousedown="event.preventDefault()" onmouseenter="_stysHoverItem(this)" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
       + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
       + ' <span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
       + '<span class="ac-qty" style="color:'+availColor+'">avail: '+avail+'</span>'
       + '</div>';
   }).join('');
   list.style.display = 'block';
+}
+function _stysHoverItem(el) {
+  var items = document.querySelectorAll('#stysAcList .ac-item');
+  items.forEach(function(item, i){ if (item === el) _stysAcIndex = i; item.classList.toggle('active', item === el); });
 }
 function hideStysItemAC() {
   var list = document.getElementById('stysAcList');
@@ -9332,14 +9345,30 @@ function pickStysItem(code) {
   hideStysItemAC();
   document.getElementById('stysQtyYards').focus();
 }
+function _refreshStysAcActive(items) {
+  for (var i = 0; i < items.length; i++) items[i].classList.toggle('active', i === _stysAcIndex);
+  if (_stysAcIndex >= 0 && items[_stysAcIndex]) {
+    items[_stysAcIndex].scrollIntoView({block:'nearest'});
+    // Mirror description into form while arrowing
+    var code = items[_stysAcIndex].getAttribute('data-code');
+    if (code) {
+      var m = (STATE.items || []).find(function(it){ return it.code === code; });
+      if (m) {
+        document.getElementById('stysItemDesc').value = m.desc || '';
+        document.getElementById('stysWidth').value    = m.size || '';
+        _stysShowAvail(code);
+      }
+    }
+  }
+}
 function onStysItemKey(e) {
   var list = document.getElementById('stysAcList');
   if (!list || list.style.display === 'none') return;
   var items = list.querySelectorAll('.ac-item');
-  if (e.key === 'ArrowDown')      { e.preventDefault(); _stysAcIndex = Math.min(_stysAcIndex+1, items.length-1); _showStysAC(document.getElementById('stysItemId').value.trim()); }
-  else if (e.key === 'ArrowUp')   { e.preventDefault(); _stysAcIndex = Math.max(_stysAcIndex-1, -1); _showStysAC(document.getElementById('stysItemId').value.trim()); }
-  else if (e.key === 'Enter')     { if (_stysAcIndex >= 0 && items[_stysAcIndex]) { e.preventDefault(); items[_stysAcIndex].click(); } }
-  else if (e.key === 'Escape')    { hideStysItemAC(); }
+  if (e.key === 'ArrowDown')    { e.preventDefault(); _stysAcIndex = Math.min(_stysAcIndex+1, items.length-1); _refreshStysAcActive(items); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _stysAcIndex = Math.max(_stysAcIndex-1, 0);              _refreshStysAcActive(items); }
+  else if (e.key === 'Enter')   { if (_stysAcIndex >= 0 && items[_stysAcIndex]) { e.preventDefault(); items[_stysAcIndex].click(); } }
+  else if (e.key === 'Escape')  { hideStysItemAC(); }
 }
 
 var _disposalEscHandler = null;
