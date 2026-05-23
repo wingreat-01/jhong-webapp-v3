@@ -9194,10 +9194,11 @@ function onStysItemInput() {
   var v = (document.getElementById('stysItemId').value || '').trim();
   _stysAcIndex = -1;
   _showStysAC(v);
-  var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
-  if (match) {
-    document.getElementById('stysItemDesc').value = match.desc || '';
-    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
+  // Only auto-fill desc if there is exactly one match for this code
+  var hits = (STATE.items || []).filter(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
+  if (hits.length === 1) {
+    document.getElementById('stysItemDesc').value = hits[0].desc || '';
+    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = hits[0].size || '';
   }
 }
 function _showStysAC(v) {
@@ -9209,9 +9210,9 @@ function _showStysAC(v) {
     return (it.code||'').toLowerCase().indexOf(q) !== -1 || (it.desc||'').toLowerCase().indexOf(q) !== -1;
   }).slice(0,30);
   if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
-  // FIX: use ac-row (styled) not ac-item (unstyled); fire pickStysItem on mousedown so blur can't race it
+  // Pass both code AND desc so pickStysItem can find the exact item even when codes are duplicate
   list.innerHTML = matches.map(function(it, i){
-    return '<div class="ac-row'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault();pickStysItem(\''+escAttr(it.code)+'\')">'
+    return '<div class="ac-row'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault();pickStysItem(\''+escAttr(it.code)+'\',\''+escAttr(it.desc||'')+'\')">'
       + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
       + '<span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
       + '</div>';
@@ -9223,12 +9224,15 @@ function hideStysItemAC() {
   if (list) { list.style.display = 'none'; list.innerHTML = ''; }
   _stysAcIndex = -1;
 }
-function pickStysItem(code) {
+function pickStysItem(code, desc) {
   document.getElementById('stysItemId').value = code;
-  var match = (STATE.items || []).find(function(it){ return it.code === code; });
+  // Match by BOTH code and desc to handle items sharing the same code
+  var match = (STATE.items || []).find(function(it){
+    return it.code === code && (desc === undefined || it.desc === desc);
+  });
   if (match) {
     document.getElementById('stysItemDesc').value = match.desc || '';
-    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
+    document.getElementById('stysWidth').value = match.size || '';
   }
   hideStysItemAC();
   document.getElementById('stysQtyYards').focus();
@@ -9250,9 +9254,11 @@ function onStysItemKey(e) {
     var active = list.querySelector('.ac-row.active');
     if (active) active.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter') {
-    // Re-query after re-render so the NodeList is never stale
     var freshRows = list.querySelectorAll('.ac-row');
-    if (_stysAcIndex >= 0 && freshRows[_stysAcIndex]) { e.preventDefault(); freshRows[_stysAcIndex].dispatchEvent(new MouseEvent('mousedown', {bubbles:true})); }
+    if (_stysAcIndex >= 0 && freshRows[_stysAcIndex]) {
+      e.preventDefault();
+      freshRows[_stysAcIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    }
   } else if (e.key === 'Escape') {
     hideStysItemAC();
   }
