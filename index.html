@@ -1882,6 +1882,12 @@ header{display:none!important}
         <label class="form-label">Item Description</label>
         <input class="form-input" id="stysItemDesc" type="text" readonly="" placeholder="Auto-filled from ITEMCODE" style="background:#ECEFF1;color:#455A64">
       </div>
+      <div class="form-group" style="grid-column:span 2;display:none" id="stysAvailRow">
+        <div id="stysAvailPill" style="display:inline-flex;align-items:center;gap:7px;background:#E8F5E9;border:1px solid #81C784;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;color:#2E7D32">
+          <span>📦 Available stock:</span>
+          <span id="stysAvailVal">&mdash;</span>
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label">Width</label>
         <input class="form-input" id="stysWidth" type="text" placeholder="Auto-filled (you can override)">
@@ -9143,6 +9149,10 @@ function openSendToYardsModal() {
   document.getElementById('stysItemDesc').value  = desc;
   document.getElementById('stysWidth').value     = width;
   document.getElementById('stysQtyYards').value  = '';
+  // Show avail balance for the pre-filled item (if any)
+  var _stysRow = document.getElementById('stysAvailRow');
+  if (_stysRow) _stysRow.style.display = 'none';
+  if (itemId) setTimeout(function(){ _stysShowAvail(itemId); }, 50);
 
   var overlay = document.getElementById('sendToYardsOverlay');
   overlay.classList.add('show');
@@ -9190,29 +9200,64 @@ function confirmSendToYards() {
   }
 
   rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, qtyYards:qty, withdrawn:0 });
-  saveState();
-  try { render3MYards(); } catch(e){}
 
-  // Save to YARDS-STOCK sheet in JHONG BACKEND
+  // Also deduct from main stock by recording this as a withdrawal
+  // so availableFor() returns the correct reduced balance.
   var today3m = (function(){
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   })();
+
+  // Parse width string into width value + unit (e.g. "24in x 50yds" → "24", "in")
+  var _stysW = '', _stysWU = 'in', _stysL = String(qty), _stysLU = 'yds';
+  var _stysWMatch = width.match(/^([0-9\/\.\-]+)\s*([a-zA-Z"']*)/);
+  if (_stysWMatch) { _stysW = _stysWMatch[1]; _stysWU = _stysWMatch[2] || 'in'; }
+
+  var whdId = 'whd_sy_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+  var whdRecord = {
+    id:           whdId,
+    date:         today3m,
+    itemCode:     itemId,
+    desc:         desc,
+    width:        _stysW,
+    widthUnit:    _stysWU,
+    length:       _stysL,
+    lengthUnit:   _stysLU,
+    qty:          1,
+    withdrawalNo: coreNo,
+    customer:     'YARDS-STOCK',
+    remarks:      'Sent to 3M Yard Ledger — Core: ' + coreNo
+  };
+
+  // Update local STATE so stock balance reflects immediately
+  STATE.withdrawals = STATE.withdrawals || [];
+  STATE.withdrawals.push(whdRecord);
+
+  saveState();
+  try { render3MYards(); } catch(e){}
+
+  // Save to YARDS-STOCK sheet in JHONG BACKEND
   var recId = 'ys_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
   postToScript({action:'save_yards_stock', record:{
     id:          recId,
     date:        today3m,
     itemCode:    itemId,
     desc:        desc,
-    width:       width,
-    widthUnit:   'in',
+    width:       _stysW,
+    widthUnit:   _stysWU,
     length:      qty,
     lengthUnit:  'yds',
     coreNo:      coreNo,
     supplier:    '3M',
     remarks:     '3M Yards Roll'
   }},
-    function(){ showToast('✓ Added to Yard Ledger and saved to YARDS-STOCK sheet.', 'success'); },
+    function(){
+      // Also save the withdrawal record to JHONG BACKEND so balance persists after Sync Now
+      postToScript({action:'save_withdrawal', record: whdRecord},
+        function(){ showToast('✓ Added to Yard Ledger — stock deducted from ' + itemId + '.', 'success'); },
+        function(err){ showToast('Yard Ledger saved — withdrawal sync failed: '+err, 'error'); }
+      );
+    },
     function(err){ showToast('Added locally — YARDS-STOCK sync failed: '+err, 'error'); }
   );
 
@@ -9220,6 +9265,24 @@ function confirmSendToYards() {
 }
 
 // ---------- Item ID autocomplete (Send to Yards modal) ----------
+function _stysShowAvail(code) {
+  var row = document.getElementById('stysAvailRow');
+  var val = document.getElementById('stysAvailVal');
+  var pill = document.getElementById('stysAvailPill');
+  if (!row || !val || !pill) return;
+  var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === (code||'').toLowerCase(); });
+  if (match) {
+    var avail = availableFor(match);
+    val.textContent = avail;
+    var color = avail <= 0 ? '#C62828' : (avail < 5 ? '#E65100' : '#2E7D32');
+    var bg    = avail <= 0 ? '#FFEBEE' : (avail < 5 ? '#FFF8E1' : '#E8F5E9');
+    var bdr   = avail <= 0 ? '#FFCDD2' : (avail < 5 ? '#FFE082' : '#81C784');
+    pill.style.color = color; pill.style.background = bg; pill.style.border = '1px solid ' + bdr;
+    row.style.display = 'block';
+  } else {
+    row.style.display = 'none';
+  }
+}
 function onStysItemInput() {
   var v = (document.getElementById('stysItemId').value || '').trim();
   _showStysAC(v);
@@ -9227,6 +9290,10 @@ function onStysItemInput() {
   if (match) {
     document.getElementById('stysItemDesc').value = match.desc || '';
     if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
+    _stysShowAvail(v);
+  } else {
+    var row = document.getElementById('stysAvailRow');
+    if (row) row.style.display = 'none';
   }
 }
 function _showStysAC(v) {
@@ -9239,9 +9306,12 @@ function _showStysAC(v) {
   }).slice(0,30);
   if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
   list.innerHTML = matches.map(function(it, i){
+    var avail = availableFor(it);
+    var availColor = avail <= 0 ? '#C62828' : (avail < 5 ? '#E65100' : '#2E7D32');
     return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault()" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
       + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
       + ' <span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
+      + '<span class="ac-qty" style="color:'+availColor+'">avail: '+avail+'</span>'
       + '</div>';
   }).join('');
   list.style.display = 'block';
@@ -9256,7 +9326,8 @@ function pickStysItem(code) {
   var match = (STATE.items || []).find(function(it){ return it.code === code; });
   if (match) {
     document.getElementById('stysItemDesc').value = match.desc || '';
-    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
+    document.getElementById('stysWidth').value = match.size || '';
+    _stysShowAvail(code);
   }
   hideStysItemAC();
   document.getElementById('stysQtyYards').focus();
