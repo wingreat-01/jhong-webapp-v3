@@ -9301,29 +9301,44 @@ function onStysItemInput() {
     if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
     _stysShowAvail(v);
   } else {
-    var row = document.getElementById('stysAvailRow');
-    if (row) row.style.display = 'none';
+    var avRow = document.getElementById('stysAvailRow');
+    if (avRow) avRow.style.display = 'none';
   }
 }
 function _showStysAC(v) {
   var list = document.getElementById('stysAcList');
   if (!list) return;
-  var q = (v||'').toLowerCase();
-  var items = STATE.items || [];
-  var matches = !q ? items.slice(0,30) : items.filter(function(it){
-    return (it.code||'').toLowerCase().indexOf(q) !== -1 || (it.desc||'').toLowerCase().indexOf(q) !== -1;
-  }).slice(0,30);
-  if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
-  list.innerHTML = matches.map(function(it, i){
-    var avail = availableFor(it);
-    var availColor = avail <= 0 ? '#C62828' : (avail < 5 ? '#E65100' : '#2E7D32');
-    return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" data-code='+escAttr(it.code)+'" onmousedown="event.preventDefault()" onmouseenter="_stysHoverItem(this)" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
-      + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
-      + ' <span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
-      + '<span class="ac-qty" style="color:'+availColor+'">avail: '+avail+'</span>'
-      + '</div>';
+  var q = (v || '').toLowerCase();
+  var allItems = STATE.items || [];
+  var matches = !q ? allItems.slice(0, 30) : allItems.filter(function(it) {
+    return (it.code || '').toLowerCase().indexOf(q) !== -1 ||
+           (it.desc || '').toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 30);
+  if (!matches.length) {
+    list.classList.remove('show');
+    list.innerHTML = '';
+    _stysAcIndex = -1;
+    return;
+  }
+  list.innerHTML = matches.map(function(it, i) {
+    var avail     = availableFor(it);
+    var clr       = avail <= 0 ? '#C62828' : (avail < 5 ? '#E65100' : '#2E7D32');
+    var isActive  = i === _stysAcIndex;
+    var safeCode  = escAttr(it.code);
+    var safeDesc  = escapeHtml(it.desc || '');
+    var safeCodeH = escapeHtml(it.code);
+    return '<div class="ac-item' + (isActive ? ' active' : '') + '"'
+         + ' data-code="' + safeCode + '"'
+         + ' data-idx="'  + i        + '"'
+         + ' onmousedown="event.preventDefault()"'
+         + ' onmouseenter="_stysHoverItem(this)"'
+         + ' onclick="pickStysItem(\'' + safeCode + '\')">'
+         + '<span class="ac-code">' + safeCodeH + '</span>'
+         + '<span class="ac-desc">' + safeDesc  + '</span>'
+         + '<span class="ac-qty" style="color:' + clr + '">avail: ' + avail + '</span>'
+         + '</div>';
   }).join('');
-  list.style.display = 'block';
+  list.classList.add('show');
 }
 function _stysHoverItem(el) {
   var items = document.querySelectorAll('#stysAcList .ac-item');
@@ -9331,7 +9346,7 @@ function _stysHoverItem(el) {
 }
 function hideStysItemAC() {
   var list = document.getElementById('stysAcList');
-  if (list) { list.style.display = 'none'; list.innerHTML = ''; }
+  if (list) { list.classList.remove('show'); list.innerHTML = ''; }
   _stysAcIndex = -1;
 }
 function pickStysItem(code) {
@@ -9363,7 +9378,7 @@ function _refreshStysAcActive(items) {
 }
 function onStysItemKey(e) {
   var list = document.getElementById('stysAcList');
-  if (!list || list.style.display === 'none') return;
+  if (!list || !list.classList.contains('show')) return;
   var items = list.querySelectorAll('.ac-item');
   if (e.key === 'ArrowDown')    { e.preventDefault(); _stysAcIndex = Math.min(_stysAcIndex+1, items.length-1); _refreshStysAcActive(items); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); _stysAcIndex = Math.max(_stysAcIndex-1, 0);              _refreshStysAcActive(items); }
