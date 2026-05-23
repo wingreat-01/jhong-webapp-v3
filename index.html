@@ -1378,7 +1378,7 @@ header{display:none!important}
         <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr;align-items:end">
           <div class="form-group ac-wrap">
             <label class="form-label">Item Code *</label>
-            <input class="form-input" type="text" id="prAddCode" placeholder="Type to search..." autocomplete="off" oninput="onPrAddCodeInput()" onkeydown="onPrAddCodeKey(event)" onblur="setTimeout(hidePrAddCodeAC,180)">
+            <input class="form-input" type="text" id="prAddCode" placeholder="Type to search..." autocomplete="off" oninput="onPrAddCodeInput()" onkeydown="onPrAddCodeKey(event)" onblur="setTimeout(hidePrAddCodeAC,300)">
             <div class="ac-list" id="prAddCodeAcList"></div>
           </div>
           <div class="form-group">
@@ -1875,8 +1875,8 @@ header{display:none!important}
       </div>
       <div class="form-group ac-wrap">
         <label class="form-label">Item ID *</label>
-        <input class="form-input" id="stysItemId" type="text" placeholder="Type to search ITEMCODE..." autocomplete="off" oninput="onStysItemInput()" onkeydown="onStysItemKey(event)" onfocus="onStysItemInput()" onblur="setTimeout(hideStysItemAC,300)">
-        <div class="ac-list" id="stysAcList" style="z-index:10020"></div>
+        <input class="form-input" id="stysItemId" type="text" placeholder="Type to search ITEMCODE..." autocomplete="off" oninput="onStysItemInput()" onkeydown="onStysItemKey(event)" onfocus="onStysItemInput()" onblur="setTimeout(hideStysItemAC,180)">
+        <div class="ac-list" id="stysAcList"></div>
       </div>
       <div class="form-group" style="grid-column:span 2">
         <label class="form-label">Item Description</label>
@@ -8792,6 +8792,7 @@ var _prAddAcMatches = [];
 
 function onPrAddCodeInput() {
   var v = (document.getElementById('prAddCode').value || '').trim();
+  _prAddAcIndex = -1;
   showPrAddCodeAC(v);
 }
 
@@ -8799,22 +8800,22 @@ function showPrAddCodeAC(v) {
   var list = document.getElementById('prAddCodeAcList');
   if (!list) return;
   var lv = v.toLowerCase();
-  if (!lv) { list.classList.remove('show'); list.innerHTML = ''; return; }
-  var rolls = STATE.partialRolls || [];
-  _prAddAcMatches = rolls.filter(function(pr){
-    return (pr.code||'').toLowerCase().indexOf(lv) !== -1;
-  });
+  // Search STATE.items (inventory) so user can add any item as a partial roll
+  var allItems = STATE.items || [];
+  _prAddAcMatches = !lv ? allItems.slice(0, 30) : allItems.filter(function(it){
+    return (it.code||'').toLowerCase().indexOf(lv) !== -1 || (it.desc||'').toLowerCase().indexOf(lv) !== -1;
+  }).slice(0, 30);
   if (!_prAddAcMatches.length) { list.classList.remove('show'); list.innerHTML = ''; return; }
-  _prAddAcIndex = -1;
-  var html = '';
-  _prAddAcMatches.forEach(function(pr, i){
-    html += '<div class="ac-row" onmousedown="event.preventDefault()" onclick="pickPrAddCode('+i+')" data-idx="'+i+'">'
-          + '<span class="ac-code">'+escapeHtml(pr.code||'')+'</span>'
-          + '<span class="ac-desc">'+escapeHtml(pr.size||'')+'</span>'
-          + '<span class="ac-qty" style="color:#2E7D32">qty: '+(pr.qty||0)+'</span>'
-          + '</div>';
-  });
-  list.innerHTML = html;
+  // Render with active highlight; fire selection on mousedown so blur cannot race it
+  list.innerHTML = _prAddAcMatches.map(function(it, i){
+    return '<div class="ac-row' + (i === _prAddAcIndex ? ' active' : '') + '"'
+      + ' onmousedown="event.preventDefault();pickPrAddCode(' + i + ')"'
+      + ' onclick="pickPrAddCode(' + i + ')"'
+      + ' data-idx="' + i + '">'
+      + '<span class="ac-code">' + escapeHtml(it.code||'') + '</span>'
+      + '<span class="ac-desc">' + escapeHtml(it.desc||'') + '</span>'
+      + '</div>';
+  }).join('');
   list.classList.add('show');
 }
 
@@ -8825,26 +8826,49 @@ function hidePrAddCodeAC() {
 }
 
 function pickPrAddCode(idx) {
-  var pr = _prAddAcMatches[idx];
-  if (!pr) return;
-  document.getElementById('prAddCode').value = pr.code || '';
-  if (pr.width)       document.getElementById('prAddWidth').value = pr.width;
-  if (pr.widthUnit)   document.getElementById('prAddWidthUnit').value = pr.widthUnit;
-  if (pr.length)      document.getElementById('prAddLength').value = pr.length;
-  if (pr.lengthUnit)  document.getElementById('prAddLengthUnit').value = pr.lengthUnit;
+  var it = _prAddAcMatches[idx];
+  if (!it) return;
+  document.getElementById('prAddCode').value = it.code || '';
+  // Auto-fill width/length from item's size string if fields are empty
+  if (it.size) {
+    var parts = String(it.size).split(/[xX×]/);
+    if (parts.length >= 2) {
+      var w = parts[0].trim(), l = parts[1].trim();
+      if (!document.getElementById('prAddWidth').value)  document.getElementById('prAddWidth').value  = parseFloat(w)  || w;
+      if (!document.getElementById('prAddLength').value) document.getElementById('prAddLength').value = parseFloat(l)  || l;
+    }
+  }
   hidePrAddCodeAC();
-  document.getElementById('prAddQty').focus();
+  document.getElementById('prAddWidth').focus();
 }
 
 function onPrAddCodeKey(e) {
   var list = document.getElementById('prAddCodeAcList');
-  var rows = list ? list.querySelectorAll('.ac-row') : [];
+  if (!list || !list.classList.contains('show')) return;
+  var rows = list.querySelectorAll('.ac-row');
   if (!rows.length) return;
-  if (e.key === 'ArrowDown') { e.preventDefault(); _prAddAcIndex = Math.min(rows.length-1, _prAddAcIndex+1); }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); _prAddAcIndex = Math.max(0, _prAddAcIndex-1); }
-  else if (e.key === 'Enter') { e.preventDefault(); if (_prAddAcIndex >= 0) rows[_prAddAcIndex].click(); return; }
-  else if (e.key === 'Escape') { hidePrAddCodeAC(); return; }
-  for (var i = 0; i < rows.length; i++) rows[i].classList.toggle('active', i === _prAddAcIndex);
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _prAddAcIndex = Math.min(rows.length - 1, _prAddAcIndex + 1);
+    // Re-render so active class is applied correctly, then scroll into view
+    showPrAddCodeAC(document.getElementById('prAddCode').value.trim());
+    var active = list.querySelector('.ac-row.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _prAddAcIndex = Math.max(0, _prAddAcIndex - 1);
+    showPrAddCodeAC(document.getElementById('prAddCode').value.trim());
+    var active = list.querySelector('.ac-row.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    var freshRows = list.querySelectorAll('.ac-row');
+    if (_prAddAcIndex >= 0 && freshRows[_prAddAcIndex]) {
+      freshRows[_prAddAcIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    }
+  } else if (e.key === 'Escape') {
+    hidePrAddCodeAC();
+  }
 }
 
 function clearPrAddForm() {
@@ -9192,29 +9216,26 @@ function confirmSendToYards() {
 // ---------- Item ID autocomplete (Send to Yards modal) ----------
 function onStysItemInput() {
   var v = (document.getElementById('stysItemId').value || '').trim();
-  _stysAcIndex = -1;
   _showStysAC(v);
-  // Only auto-fill desc if there is exactly one match for this code
-  var hits = (STATE.items || []).filter(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
-  if (hits.length === 1) {
-    document.getElementById('stysItemDesc').value = hits[0].desc || '';
-    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = hits[0].size || '';
+  var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
+  if (match) {
+    document.getElementById('stysItemDesc').value = match.desc || '';
+    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
   }
 }
 function _showStysAC(v) {
   var list = document.getElementById('stysAcList');
   if (!list) return;
   var q = (v||'').toLowerCase();
-  var allItems = STATE.items || [];
-  var matches = !q ? allItems.slice(0,30) : allItems.filter(function(it){
+  var items = STATE.items || [];
+  var matches = !q ? items.slice(0,30) : items.filter(function(it){
     return (it.code||'').toLowerCase().indexOf(q) !== -1 || (it.desc||'').toLowerCase().indexOf(q) !== -1;
   }).slice(0,30);
   if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
-  // Pass both code AND desc so pickStysItem can find the exact item even when codes are duplicate
   list.innerHTML = matches.map(function(it, i){
-    return '<div class="ac-row'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault();pickStysItem(\''+escAttr(it.code)+'\',\''+escAttr(it.desc||'')+'\')">'
+    return '<div class="ac-item'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault()" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
       + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
-      + '<span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
+      + ' <span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
       + '</div>';
   }).join('');
   list.style.display = 'block';
@@ -9224,15 +9245,12 @@ function hideStysItemAC() {
   if (list) { list.style.display = 'none'; list.innerHTML = ''; }
   _stysAcIndex = -1;
 }
-function pickStysItem(code, desc) {
+function pickStysItem(code) {
   document.getElementById('stysItemId').value = code;
-  // Match by BOTH code and desc to handle items sharing the same code
-  var match = (STATE.items || []).find(function(it){
-    return it.code === code && (desc === undefined || it.desc === desc);
-  });
+  var match = (STATE.items || []).find(function(it){ return it.code === code; });
   if (match) {
     document.getElementById('stysItemDesc').value = match.desc || '';
-    document.getElementById('stysWidth').value = match.size || '';
+    if (!document.getElementById('stysWidth').value) document.getElementById('stysWidth').value = match.size || '';
   }
   hideStysItemAC();
   document.getElementById('stysQtyYards').focus();
@@ -9240,28 +9258,11 @@ function pickStysItem(code, desc) {
 function onStysItemKey(e) {
   var list = document.getElementById('stysAcList');
   if (!list || list.style.display === 'none') return;
-  var rows = list.querySelectorAll('.ac-row');
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    _stysAcIndex = Math.min(_stysAcIndex + 1, rows.length - 1);
-    _showStysAC(document.getElementById('stysItemId').value.trim());
-    var active = list.querySelector('.ac-row.active');
-    if (active) active.scrollIntoView({ block: 'nearest' });
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    _stysAcIndex = Math.max(_stysAcIndex - 1, -1);
-    _showStysAC(document.getElementById('stysItemId').value.trim());
-    var active = list.querySelector('.ac-row.active');
-    if (active) active.scrollIntoView({ block: 'nearest' });
-  } else if (e.key === 'Enter') {
-    var freshRows = list.querySelectorAll('.ac-row');
-    if (_stysAcIndex >= 0 && freshRows[_stysAcIndex]) {
-      e.preventDefault();
-      freshRows[_stysAcIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    }
-  } else if (e.key === 'Escape') {
-    hideStysItemAC();
-  }
+  var items = list.querySelectorAll('.ac-item');
+  if (e.key === 'ArrowDown')      { e.preventDefault(); _stysAcIndex = Math.min(_stysAcIndex+1, items.length-1); _showStysAC(document.getElementById('stysItemId').value.trim()); }
+  else if (e.key === 'ArrowUp')   { e.preventDefault(); _stysAcIndex = Math.max(_stysAcIndex-1, -1); _showStysAC(document.getElementById('stysItemId').value.trim()); }
+  else if (e.key === 'Enter')     { if (_stysAcIndex >= 0 && items[_stysAcIndex]) { e.preventDefault(); items[_stysAcIndex].click(); } }
+  else if (e.key === 'Escape')    { hideStysItemAC(); }
 }
 
 var _disposalEscHandler = null;
