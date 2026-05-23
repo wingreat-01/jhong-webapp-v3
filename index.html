@@ -1876,7 +1876,7 @@ header{display:none!important}
       <div class="form-group ac-wrap">
         <label class="form-label">Item ID *</label>
         <input class="form-input" id="stysItemId" type="text" placeholder="Type to search ITEMCODE..." autocomplete="off" oninput="onStysItemInput()" onkeydown="onStysItemKey(event)" onfocus="onStysItemInput()" onblur="setTimeout(hideStysItemAC,300)">
-        <div class="ac-list" id="stysAcList"></div>
+        <div class="ac-list" id="stysAcList" style="z-index:10020"></div>
       </div>
       <div class="form-group" style="grid-column:span 2">
         <label class="form-label">Item Description</label>
@@ -9192,6 +9192,7 @@ function confirmSendToYards() {
 // ---------- Item ID autocomplete (Send to Yards modal) ----------
 function onStysItemInput() {
   var v = (document.getElementById('stysItemId').value || '').trim();
+  _stysAcIndex = -1;
   _showStysAC(v);
   var match = (STATE.items || []).find(function(it){ return String(it.code||'').toLowerCase() === v.toLowerCase(); });
   if (match) {
@@ -9203,13 +9204,14 @@ function _showStysAC(v) {
   var list = document.getElementById('stysAcList');
   if (!list) return;
   var q = (v||'').toLowerCase();
-  var items = STATE.items || [];
-  var matches = !q ? items.slice(0,30) : items.filter(function(it){
+  var allItems = STATE.items || [];
+  var matches = !q ? allItems.slice(0,30) : allItems.filter(function(it){
     return (it.code||'').toLowerCase().indexOf(q) !== -1 || (it.desc||'').toLowerCase().indexOf(q) !== -1;
   }).slice(0,30);
   if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
+  // FIX: use ac-row (styled) not ac-item (unstyled); fire pickStysItem on mousedown so blur can't race it
   list.innerHTML = matches.map(function(it, i){
-    return '<div class="ac-row'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault();pickStysItem(\''+escAttr(it.code)+'\')" onclick="pickStysItem(\''+escAttr(it.code)+'\')">'
+    return '<div class="ac-row'+(i===_stysAcIndex?' active':'')+'" onmousedown="event.preventDefault();pickStysItem(\''+escAttr(it.code)+'\')">'
       + '<span class="ac-code">'+escapeHtml(it.code)+'</span>'
       + '<span class="ac-desc">'+escapeHtml(it.desc||'')+'</span>'
       + '</div>';
@@ -9239,17 +9241,18 @@ function onStysItemKey(e) {
     e.preventDefault();
     _stysAcIndex = Math.min(_stysAcIndex + 1, rows.length - 1);
     _showStysAC(document.getElementById('stysItemId').value.trim());
-    var activeEl = list.querySelector('.ac-row.active');
-    if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    var active = list.querySelector('.ac-row.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
     _stysAcIndex = Math.max(_stysAcIndex - 1, -1);
     _showStysAC(document.getElementById('stysItemId').value.trim());
-    var activeEl = list.querySelector('.ac-row.active');
-    if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    var active = list.querySelector('.ac-row.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter') {
+    // Re-query after re-render so the NodeList is never stale
     var freshRows = list.querySelectorAll('.ac-row');
-    if (_stysAcIndex >= 0 && freshRows[_stysAcIndex]) { e.preventDefault(); freshRows[_stysAcIndex].click(); }
+    if (_stysAcIndex >= 0 && freshRows[_stysAcIndex]) { e.preventDefault(); freshRows[_stysAcIndex].dispatchEvent(new MouseEvent('mousedown', {bubbles:true})); }
   } else if (e.key === 'Escape') {
     hideStysItemAC();
   }
