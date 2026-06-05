@@ -2545,9 +2545,9 @@ function parseItemcodeRows(rows) {
     if (h === 'item description' || h === 'description' || h === 'desc' || h === 'item desc') descIdx = i;
     if (h === 'size' || h === 'units') sizeIdx = i;
     if (h === 'width') widthValIdx = i;
-    if (h === 'w-um' || h === 'wum' || h === 'width unit' || h === 'widthunit') widthUnitIdx = i;
+    if (h === 'w-um' || h === 'wum' || h === 'width unit' || h === 'widthunit' || h === 'w-unit') widthUnitIdx = i;
     if (h === 'length') lengthValIdx = i;
-    if (h === 'l-um' || h === 'lum' || h === 'length unit' || h === 'lengthunit') lengthUnitIdx = i;
+    if (h === 'l-um' || h === 'lum' || h === 'length unit' || h === 'lengthunit' || h === 'l-unit') lengthUnitIdx = i;
     // 'unit' appears twice: first after WIDTH = W-UM, second after LENGTH = L-UM
     if (h === 'unit') {
       if (widthValIdx !== -1 && widthUnitIdx === -1) widthUnitIdx = i;
