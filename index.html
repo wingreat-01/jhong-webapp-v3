@@ -788,7 +788,10 @@ header{display:none!important}
           <tr>
             <th>Item Code</th>
             <th>Description</th>
-            <th>Size</th>
+            <th>Width</th>
+            <th>W-Unit</th>
+            <th>Length</th>
+            <th>L-Unit</th>
             <th>Beginning</th>
             <th>Received</th>
             <th>Withdrawn</th>
@@ -796,7 +799,7 @@ header{display:none!important}
             <th>Status</th>
           </tr>
         </thead>
-        <tbody id="stocksBody"><tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No items loaded — click Sync Now</div></div></td></tr></tbody>
+        <tbody id="stocksBody"><tr><td colspan="11"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No items loaded — click Sync Now</div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -3057,7 +3060,7 @@ function renderStocks() {
   var body = document.getElementById('stocksBody');
   var q = (document.getElementById('stockSearch') ? document.getElementById('stockSearch').value : '').toLowerCase().trim();
   if (!STATE.items.length) {
-    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No items loaded — click Sync Now</div></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No items loaded — click Sync Now</div></div></td></tr>';
     document.getElementById('stocksBadge').textContent = '0 items';
     var _siEl = document.getElementById('statItems'); if (_siEl) _siEl.textContent = '0';
     var _el; _el = document.getElementById('statLow');       if (_el) _el.textContent = '0';
@@ -3083,7 +3086,10 @@ function renderStocks() {
     html += '<tr>'
          + '<td class="td-code">'+escapeHtml(it.code)+'</td>'
          + '<td>'+escapeHtml(it.desc||'—')+'</td>'
-         + '<td><span class="pill pill-gray">'+escapeHtml(it.size||'—')+'</span></td>'
+         + '<td style="text-align:center">'+escapeHtml(it.width||'—')+'</td>'
+         + '<td style="text-align:center;color:#607D8B;font-size:12px">'+escapeHtml(it.widthUnit||'—')+'</td>'
+         + '<td style="text-align:center">'+escapeHtml(it.length||'—')+'</td>'
+         + '<td style="text-align:center;color:#607D8B;font-size:12px">'+escapeHtml(it.lengthUnit||'—')+'</td>'
          + '<td>'+(beg)+'</td>'
          + '<td style="color:#2E7D32;font-weight:600">'+r+'</td>'
          + '<td style="color:#C62828;font-weight:600">'+w+'</td>'
@@ -3091,7 +3097,7 @@ function renderStocks() {
          + '<td><span class="pill '+pillCls+'">'+status+'</span></td>'
          + '</tr>';
   });
-  if (!html) html = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🔎</div><div class="empty-text">No items match your filter</div></div></td></tr>';
+  if (!html) html = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">🔎</div><div class="empty-text">No items match your filter</div></div></td></tr>';
   body.innerHTML = html;
   document.getElementById('stocksBadge').textContent = filtered.length + (filtered.length !== STATE.items.length ? ' of '+STATE.items.length : '') + ' items';
   var _siEl2 = document.getElementById('statItems'); if (_siEl2) _siEl2.textContent = STATE.items.length;
@@ -3140,7 +3146,7 @@ function exportStocksToExcel() {
     if (/[",\n\r]/.test(s) || /^\s|\s$/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
     return s;
   }
-  var headers = ['Item Code','Description','Size','Beginning','Received','Withdrawn','Available','Status'];
+  var headers = ['Item Code','Description','Width','W-Unit','Length','L-Unit','Beginning','Received','Withdrawn','Available','Status'];
   var lines = [headers.map(csvCell).join(',')];
   rows.forEach(function(it){
     var w = sumWithdrawnFor(it.code);
@@ -3150,7 +3156,10 @@ function exportStocksToExcel() {
     lines.push([
       it.code,
       it.desc || '',
-      it.size || '',
+      it.width || '',
+      it.widthUnit || '',
+      it.length || '',
+      it.lengthUnit || '',
       b,
       r,
       w,
