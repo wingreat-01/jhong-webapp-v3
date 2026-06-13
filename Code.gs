@@ -612,7 +612,7 @@ function _handleWrite(body) {
       String(sw.width||'').trim(), String(sw.widthUnit||'').trim(),
       String(sw.length||'').trim(), String(sw.lengthUnit||'').trim(),
       Number(sw.qty)||0, sw.withdrawalNo||'', sw.customer||'',
-      _safeText(sw.remarks||''), swId, false, '', ''
+      _safeText(sw.remarks||''), swId, false, '', '', ''
     ];
     if (swExisting !== -1) swsh.getRange(swExisting, 1, 1, swRow.length).setValues([swRow]);
     else swsh.appendRow(swRow);
