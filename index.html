@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0053)file:///C:/Users/WAREHOUSE-PC/Downloads/index_26.html -->
+<!-- saved from url=(0054)file:///C:/Users/WAREHOUSE-PC/Downloads/index_170.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -672,11 +672,11 @@ header{display:none!important}
 
 <div class="sync-indicator" id="syncIndicator" role="status" aria-live="polite">
   <div class="mini-spinner"></div>
-  <span class="sync-txt" id="syncIndicatorText">Synced in 0.7s (partial: withdrawals, received, beginning, salesorders, partialrolls, itemcode)</span>
+  <span class="sync-txt" id="syncIndicatorText">Synced in 1.6s (partial: withdrawals, received, beginning, salesorders, itemcode, partialrolls)</span>
   <span class="sync-progress" id="syncIndicatorProgress"></span>
 </div>
 
-<div class="toast" id="toast">Synced in 0.7s (partial: withdrawals, received, beginning, salesorders, partialrolls, itemcode)</div>
+<div class="toast" id="toast">Synced in 1.6s (partial: withdrawals, received, beginning, salesorders, itemcode, partialrolls)</div>
 
 <div class="app-shell">
 
@@ -1897,7 +1897,7 @@ header{display:none!important}
       <div class="form-group" style="grid-column:span 2;display:none" id="stysAvailRow">
         <div id="stysAvailPill" style="display:inline-flex;align-items:center;gap:7px;background:#E8F5E9;border:1px solid #81C784;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;color:#2E7D32">
           <span>📦 Available stock:</span>
-          <span id="stysAvailVal">&mdash;</span>
+          <span id="stysAvailVal">—</span>
         </div>
       </div>
       <div class="form-group">
@@ -7065,10 +7065,21 @@ function postToScript(payload, onSuccess, onError) {
   var actor    = STATE._isAdmin ? 'admin' : 'user';
   var adminPin = isDelete ? (STATE.config.adminPin || '') : '';
   var sep      = proxy.indexOf('?') >= 0 ? '&' : '?';
+
+  // Build a slimmed payload — strip 'action' from the JSON body since it is
+  // already sent as a URL parameter. This reduces URL length significantly and
+  // avoids the old POST fallback which does NOT work when the GAS Web App is
+  // deployed with "Anyone" access (anonymous users cannot trigger doPost).
+  var slimPayload = {};
+  for (var _k in payload) {
+    if (Object.prototype.hasOwnProperty.call(payload, _k) && _k !== 'action') {
+      slimPayload[_k] = payload[_k];
+    }
+  }
   var getUrl   = proxy + sep + 'action=' + encodeURIComponent(action)
                + '&actor=' + encodeURIComponent(actor)
                + (isDelete ? '&adminPin=' + encodeURIComponent(adminPin) : '')
-               + '&payload=' + encodeURIComponent(JSON.stringify(payload));
+               + '&payload=' + encodeURIComponent(JSON.stringify(slimPayload));
 
   var ctrl  = (typeof AbortController !== 'undefined') ? new AbortController() : null;
   var timer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 25000);
@@ -7088,32 +7099,13 @@ function postToScript(payload, onSuccess, onError) {
     if (onError) onError(String(err && err.message ? err.message : err));
   }
 
-  // Use POST automatically when the payload is too large for a GET URL.
-  // This handles save_split (and any future large payload) without hitting
-  // Google Apps Script's URL length limit. doPost() reads JSON body directly.
-  if (getUrl.length > 6000) {
-    var postBody = JSON.stringify(Object.assign({}, payload, {
-      action:   action,
-      _actor:   actor,
-      adminPin: adminPin
-    }));
-    fetch(proxy, {
-      method:   'POST',
-      cache:    'no-cache',
-      redirect: 'follow',
-      headers:  { 'Content-Type': 'application/json' },
-      body:     postBody,
-      signal:   ctrl ? ctrl.signal : undefined
-    })
-      .then(function(res){ return res.text(); })
-      .then(_handleText)
-      .catch(_handleErr);
-  } else {
-    fetch(getUrl, {method:'GET', cache:'no-cache', redirect:'follow', signal: ctrl ? ctrl.signal : undefined})
-      .then(function(res){ return res.text(); })
-      .then(_handleText)
-      .catch(_handleErr);
-  }
+  // Always use GET — GAS Web Apps deployed with "Anyone" access do not support
+  // doPost() for anonymous (non-Google-account) users; POST requests silently
+  // fail or return an HTML login page instead of JSON.
+  fetch(getUrl, {method:'GET', cache:'no-cache', redirect:'follow', signal: ctrl ? ctrl.signal : undefined})
+    .then(function(res){ return res.text(); })
+    .then(_handleText)
+    .catch(_handleErr);
 }
 
 // ---------- CSV fetcher ----------
