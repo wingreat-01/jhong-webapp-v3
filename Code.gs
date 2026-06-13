@@ -49,7 +49,7 @@ var SPLIT_TAB           = 'SPLIT';
 var SERVED_TAB          = 'SERVED';
 // Each header now ends with Deleted + DeletedAt + DeletedBy for soft-delete audit.
 var WITHDRAWAL_HEADER    = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy','CoreNo'];
-var RECEIVED_HEADER      = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var RECEIVED_HEADER      = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','WithdrawalNo','DeletedAt','DeletedBy'];
 var YARDSRECEIVED_HEADER = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 
 // YARDS-STOCK: new home for the 3M Yards Roll Ledger (replaces YARDSRECEIVED
@@ -292,7 +292,7 @@ function _handleWrite(body) {
     var rid = (rawRid && !/^rec_legacy_/.test(rawRid)) ? rawRid : _genId('rec');
     var rsh = _getReceivedSheet();
     var rexisting = _findRowById(rsh, 9, rid);
-    var rrow = [r2.date||'', String(r2.itemCode), r2.desc||'', r2.size||'', Number(r2.qty)||0, r2.mrrNo||'', r2.supplier||'', r2.remarks||'', rid, false, '', ''];
+    var rrow = [r2.date||'', String(r2.itemCode), r2.desc||'', r2.size||'', Number(r2.qty)||0, r2.mrrNo||'', r2.supplier||'', r2.remarks||'', rid, false, r2.withdrawalNo||'', '', ''];
     if (rexisting !== -1) {
       rsh.getRange(rexisting, 1, 1, rrow.length).setValues([rrow]);
     } else {
@@ -631,7 +631,7 @@ function _handleWrite(body) {
       sr.date||'', String(sr.itemCode), sr.desc||'',
       sr.size||'', Number(sr.qty)||0,
       sr.mrrNo||'', sr.supplier||'',
-      _safeText(sr.remarks||''), srId, false, '', ''
+      _safeText(sr.remarks||''), srId, false, sr.withdrawalNo||'', '', ''
     ];
     if (srExisting !== -1) srsh.getRange(srExisting, 1, 1, srRow.length).setValues([srRow]);
     else srsh.appendRow(srRow);
@@ -868,7 +868,7 @@ function _handleSaveSplit(sp) {
     splitId,
     'Internal — Roll Split',
     'Split from ' + pCode + (note ? '  ·  ' + note : ''),
-    recId, false, '', ''
+    recId, false, whdlNo, '', ''
   ]);
 
   // ── SPLIT-PARENT — audit reference (parent roll consumed) ──

@@ -3006,6 +3006,10 @@ function parseReceivedRows(rows) {
       iSize = col('size'), iQty = col('qty'),
       iMrr = col('mrr'), iSup = col('supplier'),
       iRem = col('remarks'), iId = col('id'), iDel = col('deleted');
+  var iWhdlNo = col('withdrawalno') >= 0 ? col('withdrawalno')
+              : col('withdrawal no') >= 0 ? col('withdrawal no')
+              : col('withdrawal no.') >= 0 ? col('withdrawal no.')
+              : -1;
   // BUGFIX: header may be missing 'id' / 'deleted' on legacy sheets. The
   // canonical positions are column I (id) and column J (deleted), so use
   // those as a fallback — otherwise iId stays -1, every record looks like
@@ -3034,9 +3038,10 @@ function parseReceivedRows(rows) {
       desc:     iDesc >= 0 ? String(r[iDesc]||'').trim() : '',
       size:     iSize >= 0 ? String(r[iSize]||'').trim() : '',
       qty:      iQty  >= 0 ? (parseFloat(r[iQty])||0)    : 0,
-      mrrNo:    iMrr  >= 0 ? String(r[iMrr]||'').trim()  : '',
-      supplier: iSup  >= 0 ? String(r[iSup]||'').trim()  : '',
-      remarks:  iRem  >= 0 ? String(r[iRem]||'').trim()  : '',
+      mrrNo:        iMrr    >= 0 ? String(r[iMrr]||'').trim()    : '',
+      supplier:     iSup    >= 0 ? String(r[iSup]||'').trim()    : '',
+      remarks:      iRem    >= 0 ? String(r[iRem]||'').trim()    : '',
+      withdrawalNo: iWhdlNo >= 0 ? String(r[iWhdlNo]||'').trim() : '',
       source: 'backend'
     });
   }
@@ -8564,15 +8569,16 @@ function confirmSplitRoll(){
 
     // Step 2 — RECEIVED (child credit)
     postToScript({action: 'save_split_received', record: {
-      id:       cRecId,
-      date:     date,
-      itemCode: cCode,
-      desc:     cItem.desc || '',
-      size:     cSizeForRec,
-      qty:      addQty,
-      mrrNo:    splitId,
-      supplier: 'Internal \u2014 Roll Split',
-      remarks:  'Split from ' + pCode + (note ? '  \u00b7  ' + note : '')
+      id:           cRecId,
+      date:         date,
+      itemCode:     cCode,
+      desc:         cItem.desc || '',
+      size:         cSizeForRec,
+      qty:          addQty,
+      mrrNo:        splitId,
+      supplier:     'Internal \u2014 Roll Split',
+      remarks:      'Split from ' + pCode + (note ? '  \u00b7  ' + note : ''),
+      withdrawalNo: whdlNo
     }},
     function(r2) {
       if (r2 && r2.id) cRec.id = r2.id;
