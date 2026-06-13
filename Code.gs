@@ -120,7 +120,10 @@ function doGet(e) {
     }
   }
 
-  if (action === 'read_itemcode')      return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getValues()});
+  // getDisplayValues() prevents Google Sheets from returning Date objects for
+  // fraction-like values (e.g. "3/4" in Width column gets auto-converted to a
+  // Date by Sheets; getDisplayValues() returns the cell's visible text "3/4").
+  if (action === 'read_itemcode')      return _json({ok:true, rows: _getItemcodeSheet().getDataRange().getDisplayValues()});
   if (action === 'read_codemap')       return _json({ok:true, rows: _getCodemapCodes()});
   if (action === 'read_withdrawals')   return _json({ok:true, rows: _getWithdrawalSheet().getDataRange().getValues()});
   if (action === 'read_received')      return _json({ok:true, rows: _getReceivedSheet().getDataRange().getValues()});

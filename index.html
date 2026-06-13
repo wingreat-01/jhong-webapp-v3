@@ -2587,7 +2587,7 @@ function parseItemcodeRows(rows) {
     var size = '';
     var wVal = '', wUnit = '', lVal = '', lUnit = '';
     if (hasSplitSize) {
-      wVal  = String(cols[widthValIdx]||'').trim();
+      wVal  = _sanitizeWidthVal(String(cols[widthValIdx]||'').trim());
       wUnit = String(widthUnitIdx  >= 0 ? cols[widthUnitIdx] ||'' : '').trim();
       lVal  = String(cols[lengthValIdx]||'').trim();
       lUnit = String(lengthUnitIdx >= 0 ? cols[lengthUnitIdx]||'' : '').trim();
@@ -2682,7 +2682,8 @@ function parseWithdrawalRows(rows) {
     var whdlRaw = String(r[iWhdl]||'').trim();
     if (/^whd_/.test(whdlRaw) || /^\d{4}-\d{2}-\d{2}/.test(whdlRaw)) whdlRaw = '';
     // Resolve width/length: prefer new individual columns; fall back to parsing old Size column
-    var _wRaw  = iWidth >= 0 ? String(r[iWidth]  || '').trim() : '';
+    // _sanitizeWidthVal repairs values that Sheets mis-read as dates (e.g. "3/4" → ISO string)
+    var _wRaw  = _sanitizeWidthVal(iWidth >= 0 ? String(r[iWidth]  || '').trim() : '');
     var _wuRaw = iWUnit >= 0 ? String(r[iWUnit] || '').trim() : '';
     var _lRaw  = iLen   >= 0 ? String(r[iLen]   || '').trim() : '';
     var _luRaw = iLUnit >= 0 ? String(r[iLUnit] || '').trim() : '';
@@ -2768,7 +2769,7 @@ function parseSplitParentRows(rows) {
     var code = String(r[iCode]||'').trim();
     if (!code) continue;
     var rawId = String(r[iId]||'').trim() || ('spp_r'+(i+1)+'_'+code.replace(/[^A-Za-z0-9]/g,'').slice(0,8));
-    var _wRaw  = String(r[iWidth]||'').trim();
+    var _wRaw  = _sanitizeWidthVal(String(r[iWidth]||'').trim());
     var _wuRaw = String(r[iWUnit]||'').trim();
     var _lRaw  = String(r[iLen]  ||'').trim();
     var _luRaw = String(r[iLUnit]||'').trim();
@@ -2828,7 +2829,7 @@ function parseSplitChildRows(rows) {
     var code = String(r[iCode]||'').trim();
     if (!code) continue;
     var rawId = String(r[iId]||'').trim() || ('spc_r'+(i+1)+'_'+code.replace(/[^A-Za-z0-9]/g,'').slice(0,8));
-    var _wRaw  = String(r[iWidth]||'').trim();
+    var _wRaw  = _sanitizeWidthVal(String(r[iWidth]||'').trim());
     var _wuRaw = String(r[iWUnit]||'').trim();
     var _lRaw  = String(r[iLen]  ||'').trim();
     var _luRaw = String(r[iLUnit]||'').trim();
@@ -2901,7 +2902,7 @@ function parseYardsStockRows(rows) {
       coreNo:     coreNo,
       itemId:     code,
       itemDesc:   String(r[iDesc]||'').trim(),
-      width:      String(r[iWidth]||'').trim(),
+      width:      _sanitizeWidthVal(String(r[iWidth]||'').trim()),
       widthUnit:  String(r[iWU]||'in').trim() || 'in',
       qtyYards:   parseFloat(r[iLen]) || 0,
       lengthUnit: String(r[iLU]||'yds').trim() || 'yds',
@@ -2982,7 +2983,7 @@ function parseYardsWithdrawnRows(rows) {
       date:       formatRawDate(String(r[iDate]||'').trim()),
       coreNo:     coreNo,
       itemId:     String(r[iItem]||'').trim(),
-      width:      String(r[iWidth]||'').trim(),
+      width:      _sanitizeWidthVal(String(r[iWidth]||'').trim()),
       widthUnit:  iWU >= 0 ? (String(r[iWU]||'').trim() || 'in') : 'in',
       yards:      parseFloat(r[iYards]) || 0,
       lengthUnit: iLU >= 0 ? (String(r[iLU]||'').trim() || 'yds') : 'yds',
@@ -9641,6 +9642,21 @@ function parseCSVLine(line) {
 }
 
 // ---------- Misc helpers ----------
+// Recovers a fractional width/length value that Google Sheets mis-interpreted
+// as a date. e.g. "3/4" stored in a cell → Sheets converts to Date(Mar 4) →
+// JSON serializes as "2026-03-03T16:00:00.000Z" (UTC). We convert back using
+// PH timezone offset (UTC+8) and return "3/4".  Non-ISO values pass through.
+function _sanitizeWidthVal(v) {
+  if (!v) return v;
+  var s = String(v);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) return s;
+  var d = new Date(s);
+  if (isNaN(d)) return s;
+  var phMs = d.getTime() + 8 * 3600 * 1000;
+  var ph = new Date(phMs);
+  return (ph.getUTCMonth() + 1) + '/' + ph.getUTCDate();
+}
+
 // Returns true if a "Deleted" column value should be treated as a soft-delete flag.
 // Apps Script writes booleans, but a hand-edited gsheet might contain "TRUE"/"true"/1/etc.
 function _isDeletedFlag(v) {
@@ -10194,7 +10210,7 @@ function parsePartialRollsRows(rows) {
       date:        formatRawDate(String(r[iDate]||'')),
       withdrawalId:String(r[iWdId] ||'').trim(),
       code:        code,
-      width:       String(r[iW]    ||'').trim(),
+      width:       _sanitizeWidthVal(String(r[iW]  ||'').trim()),
       widthUnit:   String(r[iWU]   ||'').trim(),
       length:      String(r[iL]    ||'').trim(),
       lengthUnit:  String(r[iLU]   ||'').trim(),
