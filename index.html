@@ -1890,9 +1890,13 @@ header{display:none!important}
         <input class="form-input" id="stysItemId" type="text" placeholder="Type to search ITEMCODE..." autocomplete="off" oninput="onStysItemInput()" onkeydown="onStysItemKey(event)" onfocus="onStysItemInput()" onblur="setTimeout(hideStysItemAC,180)">
         <div class="ac-list" id="stysAcList"></div>
       </div>
-      <div class="form-group" style="grid-column:span 2">
+      <div class="form-group">
         <label class="form-label">Item Description</label>
         <input class="form-input" id="stysItemDesc" type="text" readonly="" placeholder="Auto-filled from ITEMCODE" style="background:#ECEFF1;color:#455A64">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Withdrawal No.</label>
+        <input class="form-input" id="stysWithdrawalNo" type="text" placeholder="e.g. CO-26-1447">
       </div>
       <div class="form-group" style="grid-column:span 2;display:none" id="stysAvailRow">
         <div id="stysAvailPill" style="display:inline-flex;align-items:center;gap:7px;background:#E8F5E9;border:1px solid #81C784;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;color:#2E7D32">
@@ -8601,7 +8605,7 @@ function confirmSplitRoll(){
           length:     String(cItem.length     || ''),
           lengthUnit: String(cItem.lengthUnit || ''),
           qty:        addQty,
-          mrrNo:      splitId,
+          mrrNo:      whdlNo,
           supplier:   'Internal \u2014 Roll Split',
           note:       note || ''
         }},
@@ -9210,9 +9214,11 @@ function openSendToYardsModal() {
   var desc    = (document.getElementById('wDesc')       ? document.getElementById('wDesc').value.trim()      : '');
   var width   = (document.getElementById('wSize')       ? document.getElementById('wSize').value.trim()      : '');
 
-  document.getElementById('stysCoreNo').value    = '';
-  document.getElementById('stysItemId').value    = itemId;
-  document.getElementById('stysItemDesc').value  = desc;
+  var withdrawalNo = document.getElementById('wWhdlNo') ? document.getElementById('wWhdlNo').value.trim() : '';
+  document.getElementById('stysCoreNo').value         = '';
+  document.getElementById('stysItemId').value         = itemId;
+  document.getElementById('stysItemDesc').value       = desc;
+  document.getElementById('stysWithdrawalNo').value   = withdrawalNo;
   // Derive width from item code trailing number if available, else use form's size string
   var _stysPreW = (function(){
     var m2 = String(itemId||'').match(/-([0-9]+)\s*$/);
@@ -9242,11 +9248,12 @@ function closeSendToYardsModal() {
 }
 
 function confirmSendToYards() {
-  var coreNo = (document.getElementById('stysCoreNo').value || '').trim();
-  var itemId = (document.getElementById('stysItemId').value || '').trim();
-  var desc   = (document.getElementById('stysItemDesc').value || '').trim();
-  var width  = (document.getElementById('stysWidth').value || '').trim();
-  var qty    = parseFloat(document.getElementById('stysQtyYards').value);
+  var coreNo       = (document.getElementById('stysCoreNo').value || '').trim();
+  var itemId       = (document.getElementById('stysItemId').value || '').trim();
+  var desc         = (document.getElementById('stysItemDesc').value || '').trim();
+  var width        = (document.getElementById('stysWidth').value || '').trim();
+  var withdrawalNo = (document.getElementById('stysWithdrawalNo').value || '').trim();
+  var qty          = parseFloat(document.getElementById('stysQtyYards').value);
 
   if (!coreNo) { showToast('Core No. is required', 'error'); return; }
   if (!itemId) { showToast('Item ID is required', 'error'); return; }
@@ -9295,9 +9302,10 @@ function confirmSendToYards() {
     length:       _stysL,
     lengthUnit:   _stysLU,
     qty:          1,
-    withdrawalNo: coreNo,
+    withdrawalNo: withdrawalNo,
     customer:     'YARDS-STOCK',
-    remarks:      'Sent to 3M Yard Ledger — Core: ' + coreNo
+    remarks:      'Sent to 3M Yard Ledger — Core: ' + coreNo,
+    coreNo:       coreNo
   };
 
   // Update local STATE so stock balance reflects immediately

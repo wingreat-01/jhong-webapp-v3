@@ -48,7 +48,7 @@ var SALESORDER_TAB      = 'SALESORDER';
 var SPLIT_TAB           = 'SPLIT';
 var SERVED_TAB          = 'SERVED';
 // Each header now ends with Deleted + DeletedAt + DeletedBy for soft-delete audit.
-var WITHDRAWAL_HEADER    = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
+var WITHDRAWAL_HEADER    = ['Date','ItemCode','Description','Width','W-UM','Length','L-UM','Qty','WithdrawalNo','Customer','Remarks','ID','Deleted','DeletedAt','DeletedBy','CoreNo'];
 var RECEIVED_HEADER      = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 var YARDSRECEIVED_HEADER = ['Date','ItemCode','Description','Size','Qty','MRR','Supplier','Remarks','ID','Deleted','DeletedAt','DeletedBy'];
 
@@ -228,7 +228,7 @@ function _handleWrite(body) {
         _width = String(r.size); // fallback: whole string in Width
       }
     }
-    var row = [r.date||'', String(r.itemCode), r.desc||'', _width, _wUnit, _length, _lUnit, Number(r.qty)||0, r.withdrawalNo||'', r.customer||'', r.remarks||'', id, false, '', ''];
+    var row = [r.date||'', String(r.itemCode), r.desc||'', _width, _wUnit, _length, _lUnit, Number(r.qty)||0, r.withdrawalNo||'', r.customer||'', r.remarks||'', id, false, '', '', String(r.coreNo||'').trim()];
     if (existing !== -1) {
       sh.getRange(existing, 1, 1, row.length).setValues([row]);
     } else {
