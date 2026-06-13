@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/WAREHOUSE-PC/Downloads/index_170.html -->
+<!-- saved from url=(0054)file:///C:/Users/WAREHOUSE-PC/Downloads/index_171.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JHONG Withdrawal System v3.34</title>
@@ -8529,60 +8529,115 @@ function confirmSplitRoll(){
     return;
   }
 
-  // ── Single atomic backend call ─────────────────────────────────────────────
-  // The backend save_split handler writes 2 tabs:
-  //   SPLIT-PARENT (audit reference) · SPLIT-CHILD (child credit log)
-  // The WITHDRAWAL deduction was already submitted as a normal withdrawal before splitting.
+  // ── Chunked backend save — 4 sequential GET calls, one tab each ───────────
+  // Replaces the old single save_split POST (which silently failed for anonymous
+  // GAS deployments). Each payload is small enough to fit in a GET URL.
   showToast('Posting split ' + splitId + ' to JHONG BACKEND...', 'success');
 
-  var splitRec = {
-    splitId:          splitId,
-    date:             date,
-    parentCode:       pCode,
-    parentDesc:       pItem.desc        || '',
-    parentWidth:      splitWidth,
-    parentWidthUnit:  splitWidthUnit,
-    parentLength:     splitLength,
-    parentLengthUnit: splitLengthUnit,
-    parentSize:       pItem.size        || '',
-    parentQty:        pQty,
-    childCode:        cCode,
-    childDesc:        cItem.desc        || '',
-    childWidth:       String(cItem.width      || ''),
-    childWidthUnit:   String(cItem.widthUnit  || ''),
-    childLength:      String(cItem.length     || ''),
-    childLengthUnit:  String(cItem.lengthUnit || ''),
-    childSize:        cRec.size,
-    childQty:         addQty,
-    withdrawalId:     pRecId,
-    receivedId:       cRecId,
-    withdrawalNo:     whdlNo,
-    customer:         splitCustomer,
-    note:             note || ''
-  };
+  var cSizeForRec = (cItem.width && cItem.length)
+    ? (cItem.width  + (cItem.widthUnit  ? ' ' + cItem.widthUnit  : '')
+    + ' x ' + cItem.length + (cItem.lengthUnit ? ' ' + cItem.lengthUnit : ''))
+    : (cRec.size || '');
 
-  postToScript({action: 'save_split', record: splitRec},
-    function(res) {
-      // Adopt the backend-assigned IDs so next sync matches cleanly.
-      if (res && res.withdrawalId) pRec.id = res.withdrawalId;
-      if (res && res.splitParentId) { if (STATE.splitParent) { var _sp = STATE.splitParent.find(function(x){ return x.id === pRec.id || x.id === pRecId; }); if (_sp) _sp.id = res.splitParentId; } }
-      if (res && res.splitChildId)  cRec.id = res.splitChildId;
-      if (res && res.receivedId)    cRec.id = res.receivedId;
-      // Mark parent withdrawal as synced
-      pRec.source = 'backend';
-      saveState();
-      try { renderHistory();  } catch(e){}
-      try { renderWithdrawals ? renderWithdrawals() : renderHistory(); } catch(e){}
-      try { renderReceived(); } catch(e){}
-      try { renderStocks();   } catch(e){}
-      showToast('✓ Split ' + splitId + ' synced → WITHDRAWAL + RECEIVED (+ audit: SPLIT-PARENT, SPLIT-CHILD).', 'success');
+  // Step 1 — WITHDRAWAL (parent deduction)
+  postToScript({action: 'save_split_withdrawal', record: {
+    id:            pRecId,
+    date:          date,
+    itemCode:      pCode,
+    desc:          pItem.desc        || '',
+    width:         splitWidth,
+    widthUnit:     splitWidthUnit,
+    length:        splitLength,
+    lengthUnit:    splitLengthUnit,
+    qty:           pQty,
+    withdrawalNo:  whdlNo,
+    customer:      splitCustomer,
+    remarks:       'Split into ' + addQty + '\u00d7 ' + cCode + ' [' + splitId + ']' + (note ? '  \u00b7  ' + note : '')
+  }},
+  function(r1) {
+    if (r1 && r1.id) pRec.id = r1.id;
+
+    // Step 2 — RECEIVED (child credit)
+    postToScript({action: 'save_split_received', record: {
+      id:       cRecId,
+      date:     date,
+      itemCode: cCode,
+      desc:     cItem.desc || '',
+      size:     cSizeForRec,
+      qty:      addQty,
+      mrrNo:    splitId,
+      supplier: 'Internal \u2014 Roll Split',
+      remarks:  'Split from ' + pCode + (note ? '  \u00b7  ' + note : '')
+    }},
+    function(r2) {
+      if (r2 && r2.id) cRec.id = r2.id;
+
+      // Step 3 — SPLIT-PARENT (audit)
+      postToScript({action: 'save_split_parent', record: {
+        date:         date,
+        splitId:      splitId,
+        itemCode:     pCode,
+        desc:         pItem.desc || '',
+        width:        splitWidth,
+        widthUnit:    splitWidthUnit,
+        length:       splitLength,
+        lengthUnit:   splitLengthUnit,
+        qty:          pQty,
+        withdrawalNo: whdlNo,
+        customer:     splitCustomer,
+        note:         note || ''
+      }},
+      function() {
+
+        // Step 4 — SPLIT-CHILD (audit)
+        postToScript({action: 'save_split_child', record: {
+          date:       date,
+          splitId:    splitId,
+          itemCode:   cCode,
+          desc:       cItem.desc || '',
+          width:      String(cItem.width      || ''),
+          widthUnit:  String(cItem.widthUnit  || ''),
+          length:     String(cItem.length     || ''),
+          lengthUnit: String(cItem.lengthUnit || ''),
+          qty:        addQty,
+          mrrNo:      splitId,
+          supplier:   'Internal \u2014 Roll Split',
+          note:       note || ''
+        }},
+        function() {
+          // All 4 tabs written — adopt backend IDs and update UI
+          pRec.source = 'backend';
+          saveState();
+          try { renderHistory();  } catch(e){}
+          try { renderWithdrawals ? renderWithdrawals() : renderHistory(); } catch(e){}
+          try { renderReceived(); } catch(e){}
+          try { renderStocks();   } catch(e){}
+          showToast('\u2713 Split ' + splitId + ' synced \u2192 WITHDRAWAL + RECEIVED (+ audit: SPLIT-PARENT, SPLIT-CHILD).', 'success');
+        },
+        function(e4) {
+          // Withdrawal + Received saved; only audit tab 4 failed — not critical
+          pRec.source = 'backend';
+          saveState();
+          showToast('Split synced (SPLIT-CHILD audit failed: ' + e4 + ')', 'error');
+        });
+      },
+      function(e3) {
+        // Withdrawal + Received saved; only audit tab 3 failed — not critical
+        pRec.source = 'backend';
+        saveState();
+        showToast('Split synced (SPLIT-PARENT audit failed: ' + e3 + ')', 'error');
+      });
     },
-    function(err) {
-      // Keep local source tags; next successful sync will replace them.
+    function(e2) {
       saveState();
-      showToast('Split saved locally — backend sync failed: ' + err, 'error');
-    }
-  );
+      showToast('Split withdrawal saved — RECEIVED sync failed: ' + e2, 'error');
+    });
+  },
+  function(e1) {
+    // Nothing written yet — keep local source tags
+    saveState();
+    showToast('Split saved locally — backend sync failed: ' + e1, 'error');
+  });
 }
 
 // ============ EXCESS MATERIAL modal ============

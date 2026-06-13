@@ -591,7 +591,91 @@ function _handleWrite(body) {
     return _json({ok:true, code: ab.code, qty: abQty, row: absh.getLastRow()});
   }
 
-  // ===== SPLIT (delegates to dedicated function to avoid var-hoisting collisions) =====
+  // ===== SPLIT — chunked individual saves =====
+  // The frontend sends 4 separate GET requests instead of one large save_split.
+  // Each action writes exactly one row to one tab, keeping every URL well under
+  // GAS limits regardless of how long item codes, notes, or customer names are.
+
+  if (action === 'save_split_withdrawal') {
+    // WITHDRAWAL tab — parent roll consumed (authoritative stock deduction)
+    var sw = body.record || {};
+    if (!sw.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var rawSwId = String(sw.id || '').trim();
+    var swId = (rawSwId && !/^(whd_legacy_|spp_local_)/.test(rawSwId)) ? rawSwId : _genId('whd');
+    var swsh = _getWithdrawalSheet();
+    var swExisting = _findRowById(swsh, 12, swId);
+    var swRow = [
+      sw.date||'', String(sw.itemCode), sw.desc||'',
+      String(sw.width||'').trim(), String(sw.widthUnit||'').trim(),
+      String(sw.length||'').trim(), String(sw.lengthUnit||'').trim(),
+      Number(sw.qty)||0, sw.withdrawalNo||'', sw.customer||'',
+      _safeText(sw.remarks||''), swId, false, '', ''
+    ];
+    if (swExisting !== -1) swsh.getRange(swExisting, 1, 1, swRow.length).setValues([swRow]);
+    else swsh.appendRow(swRow);
+    return _json({ok:true, id:swId});
+  }
+
+  if (action === 'save_split_received') {
+    // RECEIVED tab — child rolls produced (authoritative stock credit)
+    var sr = body.record || {};
+    if (!sr.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var rawSrId = String(sr.id || '').trim();
+    var srId = (rawSrId && !/^(rec_legacy_|spc_local_)/.test(rawSrId)) ? rawSrId : _genId('rec');
+    var srsh = _getReceivedSheet();
+    var srExisting = _findRowById(srsh, 9, srId);
+    var srRow = [
+      sr.date||'', String(sr.itemCode), sr.desc||'',
+      sr.size||'', Number(sr.qty)||0,
+      sr.mrrNo||'', sr.supplier||'',
+      _safeText(sr.remarks||''), srId, false, '', ''
+    ];
+    if (srExisting !== -1) srsh.getRange(srExisting, 1, 1, srRow.length).setValues([srRow]);
+    else srsh.appendRow(srRow);
+    return _json({ok:true, id:srId});
+  }
+
+  if (action === 'save_split_parent') {
+    // SPLIT-PARENT tab — audit reference (parent roll consumed)
+    var spar = body.record || {};
+    if (!spar.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var sparId = String(spar.id || '').trim() || _genId('spp');
+    var sparsh = _getSplitParentSheet();
+    var sparExisting = _findRowById(sparsh, 13, sparId);
+    var sparRow = [
+      spar.date||'', String(spar.splitId||''), String(spar.itemCode),
+      spar.desc||'',
+      String(spar.width||'').trim(), String(spar.widthUnit||'').trim(),
+      String(spar.length||'').trim(), String(spar.lengthUnit||'').trim(),
+      Number(spar.qty)||0, spar.withdrawalNo||'', spar.customer||'',
+      _safeText(spar.note||''), sparId, false, '', ''
+    ];
+    if (sparExisting !== -1) sparsh.getRange(sparExisting, 1, 1, sparRow.length).setValues([sparRow]);
+    else sparsh.appendRow(sparRow);
+    return _json({ok:true, id:sparId});
+  }
+
+  if (action === 'save_split_child') {
+    // SPLIT-CHILD tab — audit reference (child rolls produced)
+    var sch = body.record || {};
+    if (!sch.itemCode) return _json({ok:false, error:'Missing itemCode'});
+    var schId = String(sch.id || '').trim() || _genId('spc');
+    var schsh = _getSplitChildSheet();
+    var schExisting = _findRowById(schsh, 13, schId);
+    var schRow = [
+      sch.date||'', String(sch.splitId||''), String(sch.itemCode),
+      sch.desc||'',
+      String(sch.width||'').trim(), String(sch.widthUnit||'').trim(),
+      String(sch.length||'').trim(), String(sch.lengthUnit||'').trim(),
+      Number(sch.qty)||0, sch.mrrNo||'', sch.supplier||'',
+      _safeText(sch.note||''), schId, false, '', ''
+    ];
+    if (schExisting !== -1) schsh.getRange(schExisting, 1, 1, schRow.length).setValues([schRow]);
+    else schsh.appendRow(schRow);
+    return _json({ok:true, id:schId});
+  }
+
+  // ===== SPLIT (legacy atomic path — kept for backward compatibility) =====
   if (action === 'save_split') {
     return _handleSaveSplit(body.record || {});
   }
