@@ -9916,7 +9916,10 @@ function applyRoleNavVisibility() {
     var btn = navButtons[idx];
     if (!btn) return;
     var allowed = isAdm || USER_VISIBLE_TABS.indexOf(tab) !== -1;
-    btn.style.display = allowed ? '' : 'none';
+    // .nav-tab has `display:flex !important` in the stylesheet, which beats
+    // a plain inline style.display — so hiding needs !important too.
+    if (allowed) btn.style.removeProperty('display');
+    else btn.style.setProperty('display', 'none', 'important');
   });
   // If a USER session lands on (or was bumped down from Admin while on) a
   // tab that's now hidden, bounce back to Stocks so nothing is stranded.
