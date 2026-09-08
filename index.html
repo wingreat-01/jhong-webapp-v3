@@ -708,14 +708,14 @@ header{display:none!important}
   </div>
 
   <nav id="mainNav">
-    <button class="nav-tab" onclick="switchTab(&#39;stocks&#39;)"><span class="tab-icon">■</span>Stocks</button>
+    <button class="nav-tab active" onclick="switchTab(&#39;stocks&#39;)"><span class="tab-icon">■</span>Stocks</button>
     <button class="nav-tab" onclick="switchTab(&#39;beginning&#39;)"><span class="tab-icon">★</span>Beginning</button>
     <button class="nav-tab" onclick="switchTab(&#39;withdraw&#39;)"><span class="tab-icon">↗</span>Withdraw</button>
     <button class="nav-tab" onclick="switchTab(&#39;salesorder&#39;)"><span class="tab-icon">🛒</span>Sales Order</button>
     <button class="nav-tab" onclick="switchTab(&#39;served&#39;)"><span class="tab-icon">✓</span>Served</button>
     <button class="nav-tab" onclick="switchTab(&#39;received&#39;)"><span class="tab-icon">↘</span>Received</button>
     <button class="nav-tab" onclick="switchTab(&#39;threemyards&#39;)"><span class="tab-icon">▥</span>3M Yards</button>
-    <button class="nav-tab active" onclick="switchTab(&#39;partialrolls&#39;)"><span class="tab-icon">⊞</span>Partial Rolls</button>
+    <button class="nav-tab" onclick="switchTab(&#39;partialrolls&#39;)"><span class="tab-icon">⊞</span>Partial Rolls</button>
     <button class="nav-tab" onclick="switchTab(&#39;search&#39;)"><span class="tab-icon">⚲</span>Search</button>
     <button class="nav-tab" onclick="switchTab(&#39;audit&#39;)"><span class="tab-icon">📊</span>Audit / Reports</button>
   </nav>
@@ -792,7 +792,7 @@ header{display:none!important}
 </div>
 
 <!-- ============ STOCKS TAB ============ -->
-<div class="tab-panel" id="tab-stocks">
+<div class="tab-panel active" id="tab-stocks">
   <div class="form-card" style="padding:14px 18px;margin-bottom:12px">
     <div style="font-size:12px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">🔍 Filter Stocks</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -1366,7 +1366,7 @@ header{display:none!important}
   </div>
 </div>
 
-<div class="tab-panel active" id="tab-partialrolls">
+<div class="tab-panel" id="tab-partialrolls">
   <div class="content">
     <div class="section-header">
       <div class="section-title">⊞ Partial Rolls</div>
@@ -10048,6 +10048,8 @@ function completeLogin(isAdmin) {
   var inp = document.getElementById('loginPinInput');
   if (inp) inp.value = '';
   try { updateRoleBadge(); } catch(e){}
+  // Every login (USER or ADMIN) always lands on Stocks first.
+  try { switchTab('stocks'); } catch(e){}
   try { showToast(isAdmin ? 'Logged in as ADMIN' : 'Logged in as USER', 'success'); } catch(e){}
 }
 
