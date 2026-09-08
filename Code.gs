@@ -1,9 +1,9 @@
-// ===== JHONG Withdrawal System v3.34 — Code.gs (Backend) =====
+// ===== YUNITRADE Withdrawal System v3.34 — Code.gs (Backend) =====
 // This is the Google Apps Script backend.
 // Deploy as Web App: Execute as Me | Who has access: Anyone
 //
 // SETUP:
-//   1. Set SHEET_ID to your JHONG BACKEND spreadsheet ID
+//   1. Set SHEET_ID to your YUNITRADE BACKEND spreadsheet ID
 //   2. Set ADMIN_PIN to your own 4-digit value
 //   3. Save, then Deploy → Manage deployments → New version → Deploy
 //   4. Open the Web App URL — the app loads directly, no token needed
@@ -28,10 +28,10 @@
 //     removed from the sheet (no resurrection on Sync Now). All other
 //     deletes (BEGINNING, SALESORDER, SERVED) remain soft for audit.
 // =====
-// Tabs in JHONG BACKEND:
+// Tabs in YUNITRADE BACKEND:
 //   ITEMCODE, WITHDRAWAL, RECEIVED, BEGINNING, SALESORDER, SPLIT, SERVED
 //
-// PASTE YOUR JHONG BACKEND SHEET ID BELOW.
+// PASTE YOUR YUNITRADE BACKEND SHEET ID BELOW.
 var SHEET_ID = '18VqdFB_anOyzMA05DXtc7I0YKE84AnEELF35gnIDsFU';
 
 // Admin PIN protects delete actions. Change this to your own 4-digit value.
@@ -108,7 +108,7 @@ function doGet(e) {
       '<script>', '<script>\nvar APPS_SCRIPT_URL=' + JSON.stringify(execUrl) + ';\n'
     );
     return HtmlService.createHtmlOutput(content)
-      .setTitle('JHONG Withdrawal System v3.34')
+      .setTitle('YUNITRADE Withdrawal System v3.34')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
@@ -888,15 +888,15 @@ function _handleSaveSplit(sp) {
 }
 
 function _openSS() {
-  if (!SHEET_ID || SHEET_ID === 'PASTE_JHONG_BACKEND_SHEET_ID_HERE') {
-    throw new Error('SHEET_ID is not set. Paste your JHONG BACKEND sheet ID.');
+  if (!SHEET_ID || SHEET_ID === 'PASTE_YUNITRADE_BACKEND_SHEET_ID_HERE') {
+    throw new Error('SHEET_ID is not set. Paste your YUNITRADE BACKEND sheet ID.');
   }
   return SpreadsheetApp.openById(SHEET_ID);
 }
 function _getItemcodeSheet() {
   var ss = _openSS();
   var sh = ss.getSheetByName(ITEMCODE_TAB);
-  if (!sh) throw new Error('ITEMCODE tab not found in JHONG BACKEND.');
+  if (!sh) throw new Error('ITEMCODE tab not found in YUNITRADE BACKEND.');
   return sh;
 }
 // Returns [{code, desc}] from CODEMAP col A (code) and col B (description).
@@ -1023,10 +1023,10 @@ function _json(obj){
 }
 
 // =====================================================================
-// STOCK MONITOR SHEET — Add-on for JHONG Withdrawal System v3.34
+// STOCK MONITOR SHEET — Add-on for YUNITRADE Withdrawal System v3.34
 // =====================================================================
 // HOW TO USE:
-//   1. Open your JHONG BACKEND Google Spreadsheet.
+//   1. Open your YUNITRADE BACKEND Google Spreadsheet.
 //   2. Go to Extensions → Apps Script.
 //   3. Paste this entire file's content at the BOTTOM of your existing
 //      Code.gs (after the last line).
@@ -1379,7 +1379,7 @@ function _writeStockMonitorContent(ss, sh) {
   }
 
   // ── Title block ──
-  row(['JHONG WITHDRAWAL SYSTEM — STOCK MONITOR', '', '', '', '', '', '', '', '', '', '', ''],
+  row(['YUNITRADE WITHDRAWAL SYSTEM — STOCK MONITOR', '', '', '', '', '', '', '', '', '', '', ''],
       '#1B5E20', '#FFFFFF', 'bold', 'left');
   row(['Last refreshed: ' + now, '', '', '', '', '', '', '', '', '', '', ''],
       '#E8F5E9', '#2E7D32', 'normal', 'left');
@@ -1575,7 +1575,7 @@ function _writeStockMonitorContent(ss, sh) {
 // BEGINNING_HEADER.
 //
 // HOW TO RUN:
-//   1. Open your JHONG BACKEND spreadsheet → Extensions → Apps Script.
+//   1. Open your YUNITRADE BACKEND spreadsheet → Extensions → Apps Script.
 //   2. Select function "migrateBeginningSheet" from the dropdown.
 //   3. Click ▶ Run.  Check the Execution Log for results.
 // =====================================================================
@@ -1652,7 +1652,7 @@ function migrateBeginningSheet() {
 // row in place.
 //
 // HOW TO RUN:
-//   1. Open your JHONG BACKEND spreadsheet → Extensions → Apps Script.
+//   1. Open your YUNITRADE BACKEND spreadsheet → Extensions → Apps Script.
 //   2. Select function "migrateWithdrawalSizeColumn" from the dropdown.
 //   3. Click ▶ Run.  Check the Execution Log for results.
 // =====================================================================

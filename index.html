@@ -2,7 +2,7 @@
 <!-- saved from url=(0054)file:///C:/Users/WAREHOUSE-PC/Downloads/index_171.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JHONG Withdrawal System v3.34</title>
+<title>YUNITRADE Withdrawal System v3.34</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
@@ -662,8 +662,21 @@ header{display:none!important}
 </head>
 <body>
 
-
-
+<!-- LOGIN GATE — blocks the whole app until a valid USER or ADMIN PIN is entered -->
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <div class="login-logo">J</div>
+    <h2>YUNITRADE Withdrawal System</h2>
+    <div class="login-sub">Enter your 4-digit PIN to continue.<br>Your PIN decides your role — <strong>USER</strong> or <strong>ADMIN</strong>.</div>
+    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="login-input" id="loginPinInput" autocomplete="off" placeholder="● ● ● ●" oninput="onLoginPinInput()" onkeydown="if(event.key==='Enter')attemptLogin()">
+    <div class="login-err" id="loginErr"></div>
+    <button class="login-btn" id="loginBtn" onclick="attemptLogin()">🔓 Unlock</button>
+    <div class="login-help">
+      <strong>👤 USER PIN</strong> — day-to-day access: stocks, withdrawals, receiving, sales orders.<br>
+      <strong>🛡 ADMIN PIN</strong> — everything USER can do, plus deletes, Settings, and Beginning Inventory edits.
+    </div>
+  </div>
+</div>
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
@@ -678,13 +691,13 @@ header{display:none!important}
 
 <div class="toast" id="toast">Synced in 1.6s (partial: withdrawals, received, beginning, salesorders, itemcode, partialrolls)</div>
 
-<div class="app-shell">
+<div class="app-shell" id="appShell" style="display:none">
 
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     <div class="sidebar-logo">J</div>
     <div>
-      <div class="sidebar-app-name">JHONG</div>
+      <div class="sidebar-app-name">YUNITRADE</div>
       <div class="sidebar-app-sub">Withdrawal System v3.34</div>
     </div>
   </div>
@@ -709,6 +722,7 @@ header{display:none!important}
     <div class="sidebar-user">
       <span id="roleBadge" class="role-badge role-user" title="Current role. Click &#39;Admin&#39; to unlock delete actions for this session.">👤 USER</span>
       <button class="sidebar-admin-btn" id="adminBtn" onclick="toggleAdminMode()" title="Switch to ADMIN mode (required for deletes). Stays unlocked until you close this tab." style="background: rgba(239, 68, 68, 0.1); color: rgb(252, 165, 165); border-color: rgba(239, 68, 68, 0.3);">🔓 Admin</button>
+      <button class="sidebar-admin-btn" id="logoutBtn" onclick="logout()" title="Lock the app and return to the login screen" style="background: rgba(255,255,255,0.08); color: #CBD5E1; border-color: rgba(255,255,255,0.15);">🔒 Log out</button>
     </div>
   </div>
 
@@ -720,7 +734,7 @@ header{display:none!important}
 
 <!-- GOOGLE SHEETS SETUP PANEL -->
 <div class="gsheet-config" id="setupPanel" style="display: none;">
-  <h3>⚙ JHONG BACKEND Setup</h3>
+  <h3>⚙ YUNITRADE BACKEND Setup</h3>
 
   <!-- Apps Script URL — primary connection field -->
   <div style="background:#E3F2FD;border:2px solid #1565C0;border-radius:10px;padding:14px 16px;margin-bottom:12px">
@@ -751,6 +765,12 @@ header{display:none!important}
       <input class="setup-input" id="beginningPin" type="text" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="🔒 4-digit PIN — Beginning / Settings (default 1234)" style="flex:1;min-width:200px;border:2px solid #6A1B9A">
       <input class="setup-input" id="adminPin" type="text" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="🛡 4-digit ADMIN PIN — required for deletes (default 7777)" style="flex:1;min-width:200px;border:2px solid #C62828;background:#FFEBEE">
     </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input class="setup-input" id="userPin" type="text" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="👤 4-digit USER PIN — login screen, standard access (default 1234)" style="flex:1;min-width:200px;border:2px solid #1565C0;background:#E3F2FD">
+    </div>
+    <div style="font-size:11px;color:#607D8B;line-height:1.6;padding:2px 2px 0">
+      The USER and ADMIN PINs above are what people type on the login screen when they open this app. Whichever PIN they enter decides their role for that session.
+    </div>
   </div>
   <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <button class="btn-primary" onclick="saveConfig()" style="display:inline-flex">💾 Save &amp; Connect</button>
@@ -761,7 +781,7 @@ header{display:none!important}
   <div style="margin-top:10px;padding:10px 14px;background:#E8F5E9;border:1px solid #81C784;border-radius:8px;font-size:12px;color:#1B5E20;line-height:1.6">
     <strong>📦 ITEMCODE sheet expected columns:</strong> Item Code, Description, Width, Width Unit, Length, Length Unit, Quantity (any column with header containing "qty" / "stock" / "quantity" / "available" works).<br>
     Add or edit rows in ITEMCODE — they show up in the STOCKS tab here automatically on next sync.<br>
-    <strong style="color:#6A1B9A">★ NEW v2.0:</strong> BEGINNING and SALESORDER tabs are auto-created in the backend on first save. The Beginning tab is locked behind the 4-digit PIN above. The Sales Order tab works like a fast-food POS — orders show up on the Kitchen tab for Jhong to prepare.
+    <strong style="color:#6A1B9A">★ NEW v2.0:</strong> BEGINNING and SALESORDER tabs are auto-created in the backend on first save. The Beginning tab is locked behind the 4-digit PIN above. The Sales Order tab works like a fast-food POS — orders show up on the Kitchen tab for Yunitrade to prepare.
   </div>
   <div id="urlTestResult" style="margin-top:8px;font-size:12px;display:none;padding:10px 14px;border-radius:8px;line-height:1.8"></div>
 </div>
@@ -916,7 +936,7 @@ header{display:none!important}
     <input type="date" class="form-input" id="servedDateFrom" onchange="renderServedTab()" style="min-width:140px;padding:9px 12px">
     <input type="date" class="form-input" id="servedDateTo" onchange="renderServedTab()" style="min-width:140px;padding:9px 12px">
     <button class="btn-secondary" onclick="clearServedFilter()" style="padding:9px 16px;font-size:13px">Clear</button>
-    <button class="btn-primary" onclick="reloadServedFromBackend()" style="padding:9px 16px;font-size:13px;background:#2E7D32" title="Pull the latest SERVED tab from JHONG BACKEND">↻ Refresh</button>
+    <button class="btn-primary" onclick="reloadServedFromBackend()" style="padding:9px 16px;font-size:13px;background:#2E7D32" title="Pull the latest SERVED tab from YUNITRADE BACKEND">↻ Refresh</button>
     <button class="btn-secondary" onclick="clearAllServed()" style="padding:9px 16px;font-size:13px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;font-weight:600" title="Clear ALL served items from this browser (the gsheet SERVED tab is NOT touched)">🗑 Clear All</button>
   </div>
 
@@ -1694,7 +1714,7 @@ header{display:none!important}
     </div>
     <div class="audit-filter-group" style="margin-bottom:12px">
       <label class="audit-filter-label">Subject</label>
-      <input type="text" class="audit-filter-input" id="auditEmailSubject" placeholder="JHONG Inventory Report">
+      <input type="text" class="audit-filter-input" id="auditEmailSubject" placeholder="YUNITRADE Inventory Report">
     </div>
     <div class="audit-filter-group" style="margin-bottom:14px">
       <label class="audit-filter-label">Message (optional)</label>
@@ -2026,7 +2046,7 @@ var STATE = {
 // ---------- localStorage ----------
 function loadState() {
   try {
-    var s = localStorage.getItem('jhong_state');
+    var s = localStorage.getItem('yunitrade_state');
     if (s) {
       var p = JSON.parse(s);
       // STATE.items intentionally NOT restored from localStorage.
@@ -2063,7 +2083,7 @@ function loadState() {
 }
 function saveState() {
   try {
-    localStorage.setItem('jhong_state', JSON.stringify({
+    localStorage.setItem('yunitrade_state', JSON.stringify({
       // items intentionally excluded — always fetched fresh from ITEMCODE sheet.
       // Persisting them caused stale autocomplete suggestions after sheet edits.
       withdrawals: STATE.withdrawals,
@@ -2089,6 +2109,9 @@ function saveState() {
 function init() {
   loadState();
 
+  var loginInp = document.getElementById('loginPinInput');
+  if (loginInp) setTimeout(function(){ loginInp.focus(); }, 100);
+
   var today = new Date();
   var iso = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
   if (document.getElementById('wDate')) document.getElementById('wDate').value = iso;
@@ -2099,6 +2122,7 @@ function init() {
   if (document.getElementById('salesOrderCsvUrl')) document.getElementById('salesOrderCsvUrl').value = STATE.config.salesOrderCsvUrl || DEFAULT_SALESORDER_CSV_URL;
   if (document.getElementById('beginningPin'))   document.getElementById('beginningPin').value  = STATE.config.beginningPin || '1234';
   if (document.getElementById('adminPin'))       document.getElementById('adminPin').value      = STATE.config.adminPin || '7777';
+  if (document.getElementById('userPin'))        document.getElementById('userPin').value       = STATE.config.userPin || '1234';
 
   renderAll();
   try { updateRoleBadge(); } catch(e){}
@@ -3183,7 +3207,7 @@ function exportStocksToExcel() {
   var blob = new Blob([BOM + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
   var d = new Date();
   var stamp = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  var filename = 'JHONG-Stocks-' + stamp + '.csv';
+  var filename = 'YUNITRADE-Stocks-' + stamp + '.csv';
   // Trigger download via a hidden anchor — works in all modern browsers.
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -3825,7 +3849,7 @@ function submitWithdrawal() {
         saveState();
         renderHistory();
         setSubmitPill('success', editingId ? '✓ Updated in backend' : '✓ Submitted to backend');
-        showToast(editingId ? 'Withdrawal updated.' : 'Withdrawal submitted to JHONG BACKEND.', 'success');
+        showToast(editingId ? 'Withdrawal updated.' : 'Withdrawal submitted to YUNITRADE BACKEND.', 'success');
         STATE._editingWithdrawalId = null;
         clearWithdrawForm();
         if (btn) { btn.disabled = false; }
@@ -4440,7 +4464,7 @@ function saveReceived() {
         rec.source = 'backend';
         saveState();
         renderReceived();
-        showToast(editingId ? 'Received record updated.' : 'Received record saved to JHONG BACKEND.', 'success');
+        showToast(editingId ? 'Received record updated.' : 'Received record saved to YUNITRADE BACKEND.', 'success');
         STATE._editingReceivedId = null;
         clearRecForm();
         if (btn) { btn.disabled = false; }
@@ -4662,7 +4686,7 @@ function save3MYardsRoll() {
     rolls[idx] = { coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, widthUnit:widthUnit, qtyYards:qty, lengthUnit:lengthUnit, withdrawn:wd, remarks:remarks, _backendId: existingBackendId };
     showToast('Roll updated — syncing to YARDS-STOCK…', 'success');
 
-    // === Sync edit to YARDS-STOCK sheet in JHONG BACKEND ===
+    // === Sync edit to YARDS-STOCK sheet in YUNITRADE BACKEND ===
     // Send BOTH the existing id AND the originalCoreNo so the backend
     // can find the row by ID first, then fall back to coreNo — preventing a
     // duplicate append when _backendId is missing.
@@ -4703,7 +4727,7 @@ function save3MYardsRoll() {
     rolls.unshift({ coreNo:coreNo, itemId:itemId, itemDesc:desc, width:width, widthUnit:widthUnit, qtyYards:qty, lengthUnit:lengthUnit, withdrawn:wd, remarks:remarks, _backendId: recId3m });
     showToast('Roll added — saving to YARDS-STOCK…', 'success');
 
-    // === Sync new roll to YARDS-STOCK sheet in JHONG BACKEND ===
+    // === Sync new roll to YARDS-STOCK sheet in YUNITRADE BACKEND ===
     var today3m = (function(){
       var d = new Date();
       return d.getFullYear() + '-'
@@ -5160,7 +5184,7 @@ function withdraw3MYards() {
   clear3MYardsWithdrawForm();
   renderTmyWithdrawals();
   render3MYards();
-  // Sync to YARDSWITHDRAWN sheet in JHONG BACKEND
+  // Sync to YARDSWITHDRAWN sheet in YUNITRADE BACKEND
   postToScript({action:'save_yardswithdrawn', record: {
     id:         entry.id,
     date:       entry.date,
@@ -5220,7 +5244,7 @@ function deleteTmyWithdrawal(id) {
   showToast('Withdrawal entry deleted.', 'success');
   renderTmyWithdrawals();
   render3MYards();
-  // Delete from YARDSWITHDRAWN sheet in JHONG BACKEND
+  // Delete from YARDSWITHDRAWN sheet in YUNITRADE BACKEND
   postToScript({action:'delete_yardswithdrawn', id: id},
     function(){ /* deleted */ },
     function(err){ showToast('Deleted locally — YARDSWITHDRAWN sheet delete failed: '+err, 'error'); }
@@ -6807,6 +6831,15 @@ function saveConfig() {
     if (aPinRaw.length === 4) STATE.config.adminPin = aPinRaw;
     else if (aPinRaw.length > 0) { showToast('Admin PIN must be exactly 4 digits — kept previous PIN', 'error'); }
   }
+  var uPinEl = document.getElementById('userPin');
+  if (uPinEl) {
+    var uPinRaw = (uPinEl.value || '').replace(/[^0-9]/g, '').slice(0, 4);
+    if (uPinRaw.length === 4) STATE.config.userPin = uPinRaw;
+    else if (uPinRaw.length > 0) { showToast('User PIN must be exactly 4 digits — kept previous PIN', 'error'); }
+  }
+  if (STATE.config.userPin === STATE.config.adminPin) {
+    showToast('Warning: USER PIN and ADMIN PIN are identical — everyone who logs in will get ADMIN access', 'error');
+  }
   saveState();
   // Show "bake into file" reminder if user just entered a URL they didn't have before
   var savedUrl = STATE.config.proxyUrl;
@@ -6879,7 +6912,7 @@ function testBeginningBackend() {
   // redeploy the script.
   var savedProxy = STATE.config.proxyUrl;
   STATE.config.proxyUrl = proxy;
-  var TEST_CODE = '__JHONG_TEST__';
+  var TEST_CODE = '__YUNITRADE_TEST__';
   postToScript({
     action: 'save_beginning_single',
     record: {code: TEST_CODE, desc: 'connectivity test', size:'', qty: 0, notes:'remove me'}
@@ -6913,7 +6946,7 @@ function _readReceivedWithBackfill(done, failed) {
       var hasLegacy = !!(parsed && parsed.some(function(r){ return r._legacyNoId; }));
       if (hasLegacy && !STATE._receivedBackfillTried) {
         STATE._receivedBackfillTried = true;
-        showToast('Repairing RECEIVED IDs in JHONG BACKEND…', 'success');
+        showToast('Repairing RECEIVED IDs in YUNITRADE BACKEND…', 'success');
         postToScript({action:'backfill_received_ids'},
           function(res){
             // Re-read so we get the freshly-written IDs.
@@ -6987,7 +7020,7 @@ function _readWithdrawalsWithBackfill(done, failed) {
       var hasLegacy = !!(parsed && parsed.some(function(r){ return r._legacyNoId; }));
       if (hasLegacy && !STATE._withdrawalBackfillTried) {
         STATE._withdrawalBackfillTried = true;
-        showToast('Repairing WITHDRAWAL IDs in JHONG BACKEND…', 'success');
+        showToast('Repairing WITHDRAWAL IDs in YUNITRADE BACKEND…', 'success');
         postToScript({action:'backfill_withdrawal_ids'},
           function(res){
             fetchFromAppsScript('read_withdrawals',
@@ -7757,7 +7790,7 @@ function clearServedFilter() {
 }
 
 // Clear ALL served records from the local list (browser only).
-// The SERVED tab in JHONG BACKEND gsheet is NOT touched — clicking
+// The SERVED tab in YUNITRADE BACKEND gsheet is NOT touched — clicking
 // ↻ Refresh afterwards will repopulate the list from the backend.
 // Sales Order rows keep their Ready/Served visual flags (per spec).
 function clearServedRow(rowKey) {
@@ -7795,7 +7828,7 @@ function clearAllServed() {
   try { showToast('🗑 Cleared ' + count + ' served record' + (count === 1 ? '' : 's') + ' (local only)', 'success'); } catch(e){}
 }
 
-// Pull SERVED rows from the JHONG BACKEND sheet and merge into STATE.served.
+// Pull SERVED rows from the YUNITRADE BACKEND sheet and merge into STATE.served.
 function reloadServedFromBackend() {
 
   fetchFromAppsScript('read_served',
@@ -8542,7 +8575,7 @@ function confirmSplitRoll(){
   // ── Chunked backend save — 4 sequential GET calls, one tab each ───────────
   // Replaces the old single save_split POST (which silently failed for anonymous
   // GAS deployments). Each payload is small enough to fit in a GET URL.
-  showToast('Posting split ' + splitId + ' to JHONG BACKEND...', 'success');
+  showToast('Posting split ' + splitId + ' to YUNITRADE BACKEND...', 'success');
 
   var cSizeForRec = (cItem.width && cItem.length)
     ? (cItem.width  + (cItem.widthUnit  ? ' ' + cItem.widthUnit  : '')
@@ -9059,7 +9092,7 @@ function _savePartialRollRecord(withdrawalId, prRaw, date, skipBackend) {
 
   if (skipBackend) return;
 
-  // === Sync to PARTIALROLLS sheet in JHONG BACKEND ===
+  // === Sync to PARTIALROLLS sheet in YUNITRADE BACKEND ===
   var prRec = {
     id:           prId,
     date:         date || '',
@@ -9321,7 +9354,7 @@ function confirmSendToYards() {
   saveState();
   try { render3MYards(); } catch(e){}
 
-  // Save to YARDS-STOCK sheet in JHONG BACKEND
+  // Save to YARDS-STOCK sheet in YUNITRADE BACKEND
   var recId = 'ys_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
   postToScript({action:'save_yards_stock', record:{
     id:          recId,
@@ -9337,7 +9370,7 @@ function confirmSendToYards() {
     remarks:     '3M Yards Roll'
   }},
     function(){
-      // Also save the withdrawal record to JHONG BACKEND so balance persists after Sync Now
+      // Also save the withdrawal record to YUNITRADE BACKEND so balance persists after Sync Now
       postToScript({action:'save_withdrawal', record: whdRecord},
         function(){ showToast('✓ Added to Yard Ledger — stock deducted from ' + itemId + '.', 'success'); },
         function(err){ showToast('Yard Ledger saved — withdrawal sync failed: '+err, 'error'); }
@@ -9908,8 +9941,74 @@ function updateRoleBadge() {
 }
 
 // ===========================================================
-// ================== LOGIN GATE (API token) =================
+// ====================== LOGIN GATE (PIN) ====================
 // ===========================================================
+// Blocks the whole app until the user types a PIN that matches either
+// the USER PIN or the ADMIN PIN (both configurable in ⚙ Settings, which
+// remains reachable only after login). Whichever PIN matches sets the
+// session role — this is the same client-side PIN model used everywhere
+// else in this app (Beginning tab, Settings, Design Mode, Admin mode),
+// not a substitute for real server-side authentication.
+function onLoginPinInput() {
+  var inp = document.getElementById('loginPinInput');
+  var v = inp.value;
+  var clean = v.replace(/[^0-9]/g, '').slice(0, 4);
+  if (clean !== v) inp.value = clean;
+  document.getElementById('loginErr').textContent = '';
+  if (clean.length === 4) attemptLogin();
+}
+
+function attemptLogin() {
+  var inp = document.getElementById('loginPinInput');
+  var err = document.getElementById('loginErr');
+  var pin = (inp.value || '').replace(/[^0-9]/g, '').slice(0, 4);
+  if (pin.length !== 4) {
+    err.textContent = 'PIN must be 4 digits';
+    return;
+  }
+  var adminPin = String(STATE.config.adminPin || '7777');
+  var userPin  = String(STATE.config.userPin  || '1234');
+  if (pin === adminPin) {
+    completeLogin(true);
+  } else if (pin === userPin) {
+    completeLogin(false);
+  } else {
+    err.textContent = '❌ Wrong PIN — try again';
+    inp.classList.add('shake');
+    setTimeout(function(){ inp.classList.remove('shake'); }, 450);
+    inp.value = '';
+    inp.focus();
+  }
+}
+
+function completeLogin(isAdmin) {
+  STATE._isAdmin = isAdmin;
+  var gate = document.getElementById('loginGate');
+  var shell = document.getElementById('appShell');
+  if (gate) gate.style.display = 'none';
+  if (shell) shell.style.display = '';
+  var inp = document.getElementById('loginPinInput');
+  if (inp) inp.value = '';
+  try { updateRoleBadge(); } catch(e){}
+  try { showToast(isAdmin ? 'Logged in as ADMIN' : 'Logged in as USER', 'success'); } catch(e){}
+}
+
+// Locks the app again and drops back to USER-level state. Does not touch
+// any saved data — Sync Now / localStorage are untouched, only the view
+// and the session role reset.
+function logout() {
+  STATE._isAdmin = false;
+  try { updateRoleBadge(); } catch(e){}
+  var shell = document.getElementById('appShell');
+  var gate = document.getElementById('loginGate');
+  if (shell) shell.style.display = 'none';
+  if (gate) gate.style.display = 'flex';
+  var inp = document.getElementById('loginPinInput');
+  var err = document.getElementById('loginErr');
+  if (err) err.textContent = '';
+  if (inp) { inp.value = ''; setTimeout(function(){ inp.focus(); }, 30); }
+}
+
 function refreshBeginningView() {
   var locked = document.getElementById('begLockedView');
   var unlocked = document.getElementById('begUnlockedView');
@@ -10313,7 +10412,7 @@ function renderSalesOrders() {
   if (badge) badge.textContent = orders.length + ' row' + (orders.length===1?'':'s');
 
   if (!orders.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No matching orders — click ↻ Refresh to re-pull from JHONG BACKEND.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No matching orders — click ↻ Refresh to re-pull from YUNITRADE BACKEND.</div></div>';
     return;
   }
 
@@ -10966,7 +11065,7 @@ function auditExportExcel() {
   var blob = new Blob([BOM + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
   var d = new Date();
   var stamp = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  var filename = 'JHONG-'+title.replace(/[^a-zA-Z0-9]+/g,'-')+'-'+stamp+'.csv';
+  var filename = 'YUNITRADE-'+title.replace(/[^a-zA-Z0-9]+/g,'-')+'-'+stamp+'.csv';
 
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -10983,7 +11082,7 @@ function auditOpenEmailModal() {
   var d = new Date();
   var stamp = d.toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'});
   var subj = document.getElementById('auditEmailSubject');
-  if (subj && !subj.value) subj.value = 'JHONG Inventory Report — '+(_auditState.lastTitle||'Audit')+ ' ('+stamp+')';
+  if (subj && !subj.value) subj.value = 'YUNITRADE Inventory Report — '+(_auditState.lastTitle||'Audit')+ ' ('+stamp+')';
   var modal = document.getElementById('auditEmailModal');
   if (modal) modal.classList.add('show');
 }
@@ -10995,7 +11094,7 @@ function auditCloseEmailModal() {
 
 function auditSendEmail() {
   var to   = (document.getElementById('auditEmailTo')||{}).value || '';
-  var subj = (document.getElementById('auditEmailSubject')||{}).value || 'JHONG Inventory Report';
+  var subj = (document.getElementById('auditEmailSubject')||{}).value || 'YUNITRADE Inventory Report';
   var body = (document.getElementById('auditEmailBody')||{}).value || '';
   var rows = _auditState.lastRows || [];
 
