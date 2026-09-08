@@ -4074,17 +4074,21 @@ function renderHistory() {
       return db - da;
     });
   } else {
-    // Default sort: withdrawal number desc, then date desc
+    // Default sort: date desc (most recent first), then withdrawal number
+    // desc as a tiebreaker for same-day records. Date must lead here —
+    // Withdrawal No. formats aren't consistent across schemes (plain
+    // numeric like "38051" vs "CO-26-3986" vs "P6480"), so sorting by that
+    // trailing number first could rank an old record above a newer one.
     filtered.sort(function(a, b){
+      var da = Date.parse(a.date), db = Date.parse(b.date);
+      var daValid = !isNaN(da), dbValid = !isNaN(db);
+      if (daValid && dbValid && da !== db) return db - da;
+      if (daValid !== dbValid) return daValid ? -1 : 1; // valid dates before missing/bad ones
       var ma = (a.withdrawalNo||'').match(/(\d+)\s*$/);
       var mb = (b.withdrawalNo||'').match(/(\d+)\s*$/);
       var na = ma ? parseInt(ma[1], 10) : -1;
       var nb = mb ? parseInt(mb[1], 10) : -1;
-      if (na !== nb) return nb - na;
-      var da = Date.parse(a.date), db = Date.parse(b.date);
-      if (isNaN(da)) return 1;
-      if (isNaN(db)) return -1;
-      return db - da;
+      return nb - na;
     });
   }
 
