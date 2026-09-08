@@ -9902,6 +9902,27 @@ function toggleAdminMode() {
   });
 }
 
+// Tabs a plain USER account is allowed to see. ADMIN always sees everything.
+var USER_VISIBLE_TABS = ['stocks','withdraw','salesorder','received','threemyards'];
+// Must match the on-screen order of the .nav-tab buttons inside #mainNav.
+var ALL_NAV_TABS = ['stocks','beginning','withdraw','salesorder','served','received','threemyards','partialrolls','search','audit'];
+
+function applyRoleNavVisibility() {
+  var isAdm = !!STATE._isAdmin;
+  var navButtons = document.querySelectorAll('#mainNav .nav-tab');
+  ALL_NAV_TABS.forEach(function(tab, idx){
+    var btn = navButtons[idx];
+    if (!btn) return;
+    var allowed = isAdm || USER_VISIBLE_TABS.indexOf(tab) !== -1;
+    btn.style.display = allowed ? '' : 'none';
+  });
+  // If a USER session lands on (or was bumped down from Admin while on) a
+  // tab that's now hidden, bounce back to Stocks so nothing is stranded.
+  if (!isAdm && USER_VISIBLE_TABS.indexOf(STATE.activeTab) === -1) {
+    switchTab('stocks');
+  }
+}
+
 function updateRoleBadge() {
   var badge = document.getElementById('roleBadge');
   var btn   = document.getElementById('adminBtn');
@@ -9938,6 +9959,7 @@ function updateRoleBadge() {
   try { renderHistory(); } catch(e){}
   try { renderReceived(); } catch(e){}
   try { renderBeginning(); } catch(e){}
+  try { applyRoleNavVisibility(); } catch(e){}
 }
 
 // ===========================================================
