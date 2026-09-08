@@ -955,6 +955,7 @@ header{display:none!important}
 <!-- ============ WITHDRAW TAB (the function) ============ -->
 <div class="tab-panel" id="tab-withdraw">
   <div class="form-card">
+    <div id="withdrawFormSection">
     <div style="font-size:13px;font-weight:600;color:#607D8B;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px">Withdraw Form</div>
 
     <!-- Row 1: Date, Item Code, Description, Size+Qty grouped -->
@@ -1017,6 +1018,7 @@ header{display:none!important}
       <button class="btn-danger" onclick="openDisposalFromWd()" title="Record items being disposed of">🗑 Disposal</button>
       <span class="submit-pill" id="wSubmitPill" title="Backend save status"><span class="pill-dot"></span></span>
     </div>
+    </div>
 
     <!-- ============ Recent Withdrawals (relocated from former Withdrawal tab) ============ -->
     <details data-region="WITHDRAW.history" open="" style="margin-top:24px">
@@ -1076,7 +1078,7 @@ header{display:none!important}
     <button class="btn-secondary" onclick="clearReceivedFilter()">Clear</button>
   </div>
 
-  <div class="form-card">
+  <div class="form-card" id="receivedAddFormSection">
     <div style="font-size:13px;font-weight:600;color:#607D8B;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px">Add Received Item (Manual Entry)</div>
     <div class="form-grid">
       <div class="form-group">
@@ -9923,6 +9925,19 @@ function applyRoleNavVisibility() {
   }
 }
 
+// Form sections that a plain USER account should not see at all (view-only
+// tabs for them — they can browse history/records but not add new ones from
+// these forms). ADMIN always sees everything.
+var USER_HIDDEN_SECTIONS = ['withdrawFormSection', 'receivedAddFormSection'];
+
+function applyRoleSectionVisibility() {
+  var isAdm = !!STATE._isAdmin;
+  USER_HIDDEN_SECTIONS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = isAdm ? '' : 'none';
+  });
+}
+
 function updateRoleBadge() {
   var badge = document.getElementById('roleBadge');
   var btn   = document.getElementById('adminBtn');
@@ -9960,6 +9975,7 @@ function updateRoleBadge() {
   try { renderReceived(); } catch(e){}
   try { renderBeginning(); } catch(e){}
   try { applyRoleNavVisibility(); } catch(e){}
+  try { applyRoleSectionVisibility(); } catch(e){}
 }
 
 // ===========================================================
