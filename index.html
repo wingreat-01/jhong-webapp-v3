@@ -9928,7 +9928,7 @@ function applyRoleNavVisibility() {
 // Form sections that a plain USER account should not see at all (view-only
 // tabs for them — they can browse history/records but not add new ones from
 // these forms). ADMIN always sees everything.
-var USER_HIDDEN_SECTIONS = ['withdrawFormSection', 'receivedAddFormSection'];
+var USER_HIDDEN_SECTIONS = ['withdrawFormSection', 'receivedAddFormSection', 'subPanel-tmy-add', 'subPanel-tmy-withdraw', 'subTab-tmy-add', 'subTab-tmy-withdraw'];
 
 function applyRoleSectionVisibility() {
   var isAdm = !!STATE._isAdmin;
@@ -9936,6 +9936,11 @@ function applyRoleSectionVisibility() {
     var el = document.getElementById(id);
     if (el) el.style.display = isAdm ? '' : 'none';
   });
+  // USER accounts can only use the Yards Stock sub-tab inside 3M Yards —
+  // bounce off Add/Edit Roll or Withdraw Yards if they're stranded there.
+  if (!isAdm && (STATE._tmySubTab === 'add' || STATE._tmySubTab === 'withdraw')) {
+    try { switchTmySubTab('stock'); } catch(e){}
+  }
 }
 
 function updateRoleBadge() {
